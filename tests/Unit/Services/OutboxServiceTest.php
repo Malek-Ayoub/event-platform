@@ -33,7 +33,13 @@ class OutboxServiceTest extends TestCase
         $this->assertSame('order.paid', $outbox->event_type);
         $this->assertSame(Order::class, $outbox->aggregate_type);
         $this->assertSame($order->id, $outbox->aggregate_id);
-        $this->assertSame(['order_id' => $order->id], $outbox->payload);
+        $this->assertSame([
+            'aggregate' => 'order',
+            'aggregate_id' => $order->id,
+            'event' => 'order.paid',
+            'version' => 1,
+            'payload' => ['order_id' => $order->id],
+        ], $outbox->payload);
         $this->assertTrue($outbox->status->value === 'pending');
         $this->assertSame(0, $outbox->attempts);
         $this->assertNull($outbox->processed_at);

@@ -3,6 +3,7 @@
 namespace App\Services\Orders;
 
 use App\Enums\OrdersDomain\OrderStatus;
+use App\Exceptions\Orders\ReservationAlreadyLinkedException;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\Reservation;
@@ -10,6 +11,7 @@ use App\Models\TicketType;
 use App\Services\ActivityLogService;
 use App\Services\Orders\Data\CreateOrderData;
 use App\Services\Orders\Data\CreateOrderLineItemData;
+use App\Services\Orders\Data\ResolvedOrderLineItemData;
 use App\Services\OutboxService;
 use App\Services\TransactionRunner;
 use Illuminate\Support\Str;
@@ -28,7 +30,8 @@ class OrderService
         return $this->transactionRunner->run(function () use ($data): Order {
             $event = Event::query()->findOrFail($data->eventId);
 
-            $totals = $this->calculateTotals($data->lineItems);
+            $resolvedLineItems = $this->resolveLineItems($data->lineItems);
+            $totals = $this->calculateTotals($resolvedLineItems);
 
             $order = Order::query()->create([
                 'venue_id' => $event->venue_id,
@@ -50,7 +53,7 @@ class OrderService
                 'customer_phone' => $data->customerPhone,
             ]);
 
-            $this->ticketService->createForOrder($order, $event, $data->lineItems);
+            $this->ticketService->createForOrder($order, $event, $resolvedLineItems);
 
             if ($data->reservationId !== null) {
                 $this->linkReservation($order, $data->reservationId);
@@ -62,10 +65,12 @@ class OrderService
                 action: 'created',
                 newValues: [
                     'order_number' => $order->order_number,
+                    'event_id' => $order->event_id,
                     'status' => $order->status->value,
+                    'subtotal' => $order->subtotal,
                     'total' => $order->total,
                 ],
-                changedFields: ['order_number', 'status', 'total'],
+                changedFields: ['order_number', 'event_id', 'status', 'subtotal', 'total'],
                 ipAddress: $data->ipAddress,
             );
 
@@ -73,9 +78,9 @@ class OrderService
                 eventType: 'order.created',
                 aggregate: $order,
                 payload: [
-                    'order_id' => $order->id,
                     'order_number' => $order->order_number,
                     'event_id' => $order->event_id,
+                    'subtotal' => $order->subtotal,
                     'total' => $order->total,
                 ],
             );
@@ -86,6 +91,34 @@ class OrderService
 
     /**
      * @param  list<CreateOrderLineItemData>  $lineItems
+     * @return list<ResolvedOrderLineItemData>
+     */
+    private function resolveLineItems(array $lineItems): array
+    {
+        $resolved = [];
+
+        foreach ($lineItems as $lineItem) {
+            if ($lineItem->quantity < 1) {
+                continue;
+            }
+
+            $ticketType = TicketType::query()
+                ->whereKey($lineItem->ticketTypeId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $resolved[] = new ResolvedOrderLineItemData(
+                ticketType: $ticketType,
+                quantity: $lineItem->quantity,
+                unitPrice: $this->formatPrice($ticketType->price),
+            );
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * @param  list<ResolvedOrderLineItemData>  $lineItems
      * @return array{subtotal: string, tax_amount: string, discount_amount: string, total: string}
      */
     private function calculateTotals(array $lineItems): array
@@ -93,12 +126,7 @@ class OrderService
         $subtotal = '0.00';
 
         foreach ($lineItems as $lineItem) {
-            if ($lineItem->quantity < 1) {
-                continue;
-            }
-
-            $ticketType = TicketType::query()->findOrFail($lineItem->ticketTypeId);
-            $lineTotal = bcmul((string) $ticketType->price, (string) $lineItem->quantity, 2);
+            $lineTotal = bcmul($lineItem->unitPrice, (string) $lineItem->quantity, 2);
             $subtotal = bcadd($subtotal, $lineTotal, 2);
         }
 
@@ -121,7 +149,16 @@ class OrderService
             ->lockForUpdate()
             ->firstOrFail();
 
+        if ($reservation->order_id !== null) {
+            throw ReservationAlreadyLinkedException::forReservation($reservationId, (int) $reservation->order_id);
+        }
+
         $reservation->update(['order_id' => $order->id]);
+    }
+
+    private function formatPrice(mixed $price): string
+    {
+        return number_format((float) $price, 2, '.', '');
     }
 
     private function generateOrderNumber(): string

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\InfrastructureDomain\OutboxEventStatus;
 use App\Models\OutboxEvent;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class OutboxService extends BaseService
 {
@@ -18,17 +19,38 @@ class OutboxService extends BaseService
         object $aggregate,
         array $payload,
         ?int $venueId = null,
+        int $version = 1,
     ): OutboxEvent {
         return OutboxEvent::query()->create([
             'venue_id' => $this->resolveVenueId($venueId, $aggregate),
             'event_type' => $eventType,
             'aggregate_type' => $this->aggregateType($aggregate),
             'aggregate_id' => $this->aggregateId($aggregate),
-            'payload' => $payload,
+            'payload' => $this->envelope($eventType, $aggregate, $payload, $version),
             'status' => OutboxEventStatus::Pending,
             'attempts' => 0,
             'processed_at' => null,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function envelope(string $eventType, object $aggregate, array $payload, int $version): array
+    {
+        return [
+            'aggregate' => $this->aggregateShortName($aggregate),
+            'aggregate_id' => $this->aggregateId($aggregate),
+            'event' => $eventType,
+            'version' => $version,
+            'payload' => $payload,
+        ];
+    }
+
+    private function aggregateShortName(object $aggregate): string
+    {
+        return Str::snake(class_basename($aggregate));
     }
 
     private function aggregateType(object $aggregate): string

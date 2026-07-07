@@ -8,8 +8,7 @@ use App\Exceptions\Orders\InvalidTicketTypeException;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\Ticket;
-use App\Models\TicketType;
-use App\Services\Orders\Data\CreateOrderLineItemData;
+use App\Services\Orders\Data\ResolvedOrderLineItemData;
 
 class TicketService
 {
@@ -18,7 +17,7 @@ class TicketService
     ) {}
 
     /**
-     * @param  list<CreateOrderLineItemData>  $lineItems
+     * @param  list<ResolvedOrderLineItemData>  $lineItems
      * @return list<Ticket>
      */
     public function createForOrder(Order $order, Event $event, array $lineItems): array
@@ -41,16 +40,13 @@ class TicketService
     private function createTicketsForLineItem(
         Order $order,
         Event $event,
-        CreateOrderLineItemData $lineItem,
+        ResolvedOrderLineItemData $lineItem,
     ): array {
         if ($lineItem->quantity < 1) {
             return [];
         }
 
-        $ticketType = TicketType::query()
-            ->whereKey($lineItem->ticketTypeId)
-            ->lockForUpdate()
-            ->firstOrFail();
+        $ticketType = $lineItem->ticketType;
 
         if ($ticketType->event_id !== $order->event_id) {
             throw InvalidTicketTypeException::forOrder($ticketType->id, (int) $order->id);

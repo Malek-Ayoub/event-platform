@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services\Orders;
 
 use App\Exceptions\Orders\InsufficientTicketsException;
+use App\Exceptions\Orders\ReservationAlreadyLinkedException;
 use App\Models\ActivityLog;
 use App\Models\Event;
 use App\Models\Order;
@@ -59,18 +60,29 @@ class OrderServiceTest extends TestCase
         $this->assertSame(2, $ticketType->fresh()->quantity_sold);
 
         $this->assertDatabaseHas('activity_logs', [
+            'venue_id' => $venue->id,
             'entity_type' => Order::class,
             'entity_id' => $order->id,
             'action' => 'created',
             'actor_user_id' => $owner->id,
         ]);
 
-        $this->assertDatabaseHas('outbox_events', [
-            'event_type' => 'order.created',
-            'aggregate_type' => Order::class,
+        $outbox = OutboxEvent::query()->where('aggregate_id', $order->id)->first();
+        $this->assertNotNull($outbox);
+        $this->assertSame('order.created', $outbox->event_type);
+        $this->assertSame(Order::class, $outbox->aggregate_type);
+        $this->assertSame([
+            'aggregate' => 'order',
             'aggregate_id' => $order->id,
-            'status' => 'pending',
-        ]);
+            'event' => 'order.created',
+            'version' => 1,
+            'payload' => [
+                'order_number' => $order->order_number,
+                'event_id' => $order->event_id,
+                'subtotal' => $order->subtotal,
+                'total' => $order->total,
+            ],
+        ], $outbox->payload);
     }
 
     #[Test]
@@ -97,6 +109,71 @@ class OrderServiceTest extends TestCase
         ));
 
         $this->assertSame($order->id, $reservation->fresh()->order_id);
+    }
+
+    #[Test]
+    public function it_snapshots_ticket_prices_at_checkout_and_does_not_recalculate_from_ticket_type(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $ticketType = TicketType::factory()->forEvent($event)->create([
+            'price' => 100,
+            'quantity' => 5,
+        ]);
+
+        $order = app(OrderService::class)->createOrder(new CreateOrderData(
+            eventId: $event->id,
+            customerName: 'Jane Doe',
+            customerEmail: 'jane@example.com',
+            customerPhone: null,
+            customerUserId: null,
+            lineItems: [new CreateOrderLineItemData($ticketType->id, 2)],
+        ));
+
+        $ticketType->update(['price' => 999]);
+
+        $this->assertSame('200.00', $order->fresh()->subtotal);
+        $this->assertSame('200.00', $order->fresh()->total);
+    }
+
+    #[Test]
+    public function it_rolls_back_when_reservation_is_already_linked_to_an_order(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
+        $zone = Zone::factory()->forEvent($event)->create();
+        $table = VenueTable::factory()->forZone($zone)->create();
+        $seat = TableSeat::factory()->forVenueTable($table)->create();
+        $existingOrder = Order::factory()->forEvent($event)->create();
+        $reservation = Reservation::factory()->forTableSeat($seat)->create([
+            'order_id' => $existingOrder->id,
+        ]);
+
+        try {
+            app(OrderService::class)->createOrder(new CreateOrderData(
+                eventId: $event->id,
+                customerName: 'Jane Doe',
+                customerEmail: 'jane@example.com',
+                customerPhone: null,
+                customerUserId: null,
+                lineItems: [new CreateOrderLineItemData($ticketType->id, 1)],
+                reservationId: $reservation->id,
+            ));
+            $this->fail('Expected ReservationAlreadyLinkedException');
+        } catch (ReservationAlreadyLinkedException) {
+            // expected
+        }
+
+        $this->assertSame(1, Order::query()->count());
+        $this->assertSame(0, Ticket::query()->count());
+        $this->assertSame($existingOrder->id, $reservation->fresh()->order_id);
+        $this->assertSame(0, ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->count());
+        $this->assertSame(0, OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->count());
     }
 
     #[Test]

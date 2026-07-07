@@ -8,7 +8,7 @@ use App\Models\Event;
 use App\Models\Order;
 use App\Models\Ticket;
 use App\Models\TicketType;
-use App\Services\Orders\Data\CreateOrderLineItemData;
+use App\Services\Orders\Data\ResolvedOrderLineItemData;
 use App\Services\Orders\TicketSerialService;
 use App\Services\Orders\TicketService;
 use App\Services\TransactionRunner;
@@ -35,7 +35,7 @@ class TicketServiceTest extends TestCase
         $tickets = $runner->run(fn () => app(TicketService::class)->createForOrder(
             $order,
             $event,
-            [new CreateOrderLineItemData($ticketType->id, 1)],
+            [$this->resolvedLineItem($ticketType, 1)],
         ));
 
         $this->assertCount(1, $tickets);
@@ -59,7 +59,7 @@ class TicketServiceTest extends TestCase
         $tickets = $runner->run(fn () => app(TicketService::class)->createForOrder(
             $order,
             $event,
-            [new CreateOrderLineItemData($ticketType->id, 3)],
+            [$this->resolvedLineItem($ticketType, 3)],
         ));
 
         $this->assertCount(3, $tickets);
@@ -89,7 +89,7 @@ class TicketServiceTest extends TestCase
             $runner->run(fn () => app(TicketService::class)->createForOrder(
                 $order,
                 $event,
-                [new CreateOrderLineItemData($ticketType->id, 2)],
+                [$this->resolvedLineItem($ticketType, 2)],
             ));
             $this->fail('Expected RuntimeException');
         } catch (RuntimeException) {
@@ -118,7 +118,16 @@ class TicketServiceTest extends TestCase
         app(TransactionRunner::class)->run(fn () => app(TicketService::class)->createForOrder(
             $order,
             $event,
-            [new CreateOrderLineItemData($ticketType->id, 2)],
+            [$this->resolvedLineItem($ticketType, 2)],
         ));
+    }
+
+    private function resolvedLineItem(TicketType $ticketType, int $quantity): ResolvedOrderLineItemData
+    {
+        return new ResolvedOrderLineItemData(
+            ticketType: $ticketType,
+            quantity: $quantity,
+            unitPrice: number_format((float) $ticketType->price, 2, '.', ''),
+        );
     }
 }
