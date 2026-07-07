@@ -6,9 +6,11 @@ use App\Models\Category;
 use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\Order;
+use App\Models\PaymentTransaction;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\PromoCode;
+use App\Models\Refund;
 use App\Models\Reservation;
 use App\Models\TaxRate;
 use App\Models\TicketType;
@@ -19,9 +21,11 @@ use App\Policies\CategoryPolicy;
 use App\Policies\CouponPolicy;
 use App\Policies\EventPolicy;
 use App\Policies\OrderPolicy;
+use App\Policies\PaymentTransactionPolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\ProductVariantPolicy;
 use App\Policies\PromoCodePolicy;
+use App\Policies\RefundPolicy;
 use App\Policies\ReservationPolicy;
 use App\Policies\TaxRatePolicy;
 use App\Policies\TicketTypePolicy;
@@ -51,6 +55,8 @@ class AuthServiceProvider extends ServiceProvider
         PromoCode::class => PromoCodePolicy::class,
         TaxRate::class => TaxRatePolicy::class,
         Order::class => OrderPolicy::class,
+        PaymentTransaction::class => PaymentTransactionPolicy::class,
+        Refund::class => RefundPolicy::class,
     ];
 
     public function boot(): void

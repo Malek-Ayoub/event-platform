@@ -1560,7 +1560,7 @@ Domain & Authorization (§1.1)
 ☑ Phase 4.2 — Event Domain models + policies
 ☑ Phase 4.3 — Commerce Domain
 ☑ Phase 4.4a — Orders & Tickets (Order, Ticket, TicketSerialCounter)
-☐ Phase 4.4b — Payments & Commissions (PaymentTransaction, Refund, Commission, CommissionAdjustment)
+☑ Phase 4.4b — Payments & Commissions (PaymentTransaction, Refund, Commission, CommissionAdjustment)
 ☐ Phase 4.5 — Infrastructure models + Architecture Review (قبل Phase 5)
 ☐ Phase 5  — Domain Services (Repositories, Services, Actions, Transactions, Outbox hooks)
 ☐ Phase 6  — APIs (Business Controllers: Events, Orders, Reservations, Products, …)
