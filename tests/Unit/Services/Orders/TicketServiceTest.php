@@ -1,0 +1,124 @@
+<?php
+
+namespace Tests\Unit\Services\Orders;
+
+use App\Enums\OrdersDomain\OrderStatus;
+use App\Exceptions\Orders\InsufficientTicketsException;
+use App\Models\Event;
+use App\Models\Order;
+use App\Models\Ticket;
+use App\Models\TicketType;
+use App\Services\Orders\Data\CreateOrderLineItemData;
+use App\Services\Orders\TicketSerialService;
+use App\Services\Orders\TicketService;
+use App\Services\TransactionRunner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
+use Tests\TestCase;
+
+class TicketServiceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    #[Test]
+    public function it_creates_a_single_ticket_for_an_order(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $ticketType = TicketType::factory()->forEvent($event)->create(['price' => 50, 'quantity' => 10]);
+        $order = Order::factory()->forEvent($event)->create(['status' => OrderStatus::Pending]);
+
+        $runner = app(TransactionRunner::class);
+        $tickets = $runner->run(fn () => app(TicketService::class)->createForOrder(
+            $order,
+            $event,
+            [new CreateOrderLineItemData($ticketType->id, 1)],
+        ));
+
+        $this->assertCount(1, $tickets);
+        $this->assertSame($order->id, $tickets[0]->order_id);
+        $this->assertSame('000001', $tickets[0]->serial);
+        $this->assertSame('tickets/'.$event->id.'/000001.png', $tickets[0]->qr_code_path);
+        $this->assertSame(1, $ticketType->fresh()->quantity_sold);
+    }
+
+    #[Test]
+    public function it_creates_multiple_tickets_with_unique_serials(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 10]);
+        $order = Order::factory()->forEvent($event)->create();
+
+        $runner = app(TransactionRunner::class);
+        $tickets = $runner->run(fn () => app(TicketService::class)->createForOrder(
+            $order,
+            $event,
+            [new CreateOrderLineItemData($ticketType->id, 3)],
+        ));
+
+        $this->assertCount(3, $tickets);
+        $serials = collect($tickets)->pluck('serial')->all();
+        $this->assertSame(['000001', '000002', '000003'], $serials);
+        $this->assertSame(3, count(array_unique($serials)));
+    }
+
+    #[Test]
+    public function ticket_creation_failure_rolls_back_all_tickets(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 10]);
+        $order = Order::factory()->forEvent($event)->create();
+
+        $this->mock(TicketSerialService::class, function ($mock): void {
+            $mock->shouldReceive('nextSerial')->once()->andReturn('000001');
+            $mock->shouldReceive('nextSerial')->once()->andThrow(new RuntimeException('serial failed'));
+        });
+
+        $runner = app(TransactionRunner::class);
+
+        try {
+            $runner->run(fn () => app(TicketService::class)->createForOrder(
+                $order,
+                $event,
+                [new CreateOrderLineItemData($ticketType->id, 2)],
+            ));
+            $this->fail('Expected RuntimeException');
+        } catch (RuntimeException) {
+            // expected
+        }
+
+        $this->assertSame(0, Ticket::query()->count());
+        $this->assertSame(0, $ticketType->fresh()->quantity_sold);
+    }
+
+    #[Test]
+    public function it_throws_when_insufficient_tickets_available(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $ticketType = TicketType::factory()->forEvent($event)->create([
+            'quantity' => 2,
+            'quantity_sold' => 1,
+        ]);
+        $order = Order::factory()->forEvent($event)->create();
+
+        $this->expectException(InsufficientTicketsException::class);
+
+        app(TransactionRunner::class)->run(fn () => app(TicketService::class)->createForOrder(
+            $order,
+            $event,
+            [new CreateOrderLineItemData($ticketType->id, 2)],
+        ));
+    }
+}
