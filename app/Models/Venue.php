@@ -114,4 +114,39 @@ class Venue extends Model
     {
         return $this->hasMany(Commission::class);
     }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    public function emailTemplates(): HasMany
+    {
+        return $this->hasMany(EmailTemplate::class);
+    }
+
+    public function smsTemplates(): HasMany
+    {
+        return $this->hasMany(SmsTemplate::class);
+    }
+
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
+
+    public function outboxEvents(): HasMany
+    {
+        return $this->hasMany(OutboxEvent::class);
+    }
+
+    public function media(): HasMany
+    {
+        return $this->hasMany(Media::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
 }

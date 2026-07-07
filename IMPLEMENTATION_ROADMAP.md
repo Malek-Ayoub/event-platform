@@ -1519,7 +1519,7 @@ tests/
 6. ✅ Phase 4.3 — Commerce Domain
 7. Phase 4.4a — Orders & Tickets (Order, Ticket, TicketSerialCounter)
 8. Phase 4.4b — Payments & Commissions (PaymentTransaction, Refund, Commission, CommissionAdjustment)
-9. Phase 4.5 — Infrastructure models + Architecture Review
+9. ✅ Phase 4.5 — Infrastructure models + Architecture Review
 10. Domain Services (Phase 5)
 11. APIs (Phase 6) — Controllers/Requests/Resources للأعمال (Events, Orders, Reservations, …)
 12. Payments (Phase 7) — Gateway, Webhooks, Refunds, Commissions
@@ -1561,7 +1561,7 @@ Domain & Authorization (§1.1)
 ☑ Phase 4.3 — Commerce Domain
 ☑ Phase 4.4a — Orders & Tickets (Order, Ticket, TicketSerialCounter)
 ☑ Phase 4.4b — Payments & Commissions (PaymentTransaction, Refund, Commission, CommissionAdjustment)
-☐ Phase 4.5 — Infrastructure models + Architecture Review (قبل Phase 5)
+☑ Phase 4.5 — Infrastructure models + Architecture Review (قبل Phase 5)
 ☐ Phase 5  — Domain Services (Repositories, Services, Actions, Transactions, Outbox hooks)
 ☐ Phase 6  — APIs (Business Controllers: Events, Orders, Reservations, Products, …)
 ☐ Phase 7  — Payments (Gateway, Webhooks, Refunds, Commissions)

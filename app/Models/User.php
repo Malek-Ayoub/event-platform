@@ -57,6 +57,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserPermission::class);
     }
 
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class, 'actor_user_id');
+    }
+
     public function isSuperAdmin(): bool
     {
         return (bool) $this->is_super_admin;
