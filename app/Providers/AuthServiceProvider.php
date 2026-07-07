@@ -1,0 +1,82 @@
+<?php
+
+namespace App\Providers;
+
+use App\Models\Category;
+use App\Models\Coupon;
+use App\Models\Event;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\PromoCode;
+use App\Models\Reservation;
+use App\Models\TaxRate;
+use App\Models\TicketType;
+use App\Models\User;
+use App\Models\UserPermission;
+use App\Models\Venue;
+use App\Policies\CategoryPolicy;
+use App\Policies\CouponPolicy;
+use App\Policies\EventPolicy;
+use App\Policies\OrderPolicy;
+use App\Policies\ProductPolicy;
+use App\Policies\ProductVariantPolicy;
+use App\Policies\PromoCodePolicy;
+use App\Policies\ReservationPolicy;
+use App\Policies\TaxRatePolicy;
+use App\Policies\TicketTypePolicy;
+use App\Policies\UserPermissionPolicy;
+use App\Policies\UserPolicy;
+use App\Policies\VenuePolicy;
+use App\Services\Authorization\PermissionGateRegistrar;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Gate;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    /**
+     * @var array<class-string, class-string>
+     */
+    protected $policies = [
+        User::class => UserPolicy::class,
+        Venue::class => VenuePolicy::class,
+        UserPermission::class => UserPermissionPolicy::class,
+        Category::class => CategoryPolicy::class,
+        Event::class => EventPolicy::class,
+        TicketType::class => TicketTypePolicy::class,
+        Reservation::class => ReservationPolicy::class,
+        Product::class => ProductPolicy::class,
+        ProductVariant::class => ProductVariantPolicy::class,
+        Coupon::class => CouponPolicy::class,
+        PromoCode::class => PromoCodePolicy::class,
+        TaxRate::class => TaxRatePolicy::class,
+        Order::class => OrderPolicy::class,
+    ];
+
+    public function boot(): void
+    {
+        $this->registerPolicies();
+        $this->registerAuthorizationGates();
+    }
+
+    protected function registerAuthorizationGates(): void
+    {
+        Gate::before(function (User $user, string $ability): ?bool {
+            if ($ability === 'manageUserPermissions') {
+                return null;
+            }
+
+            if ($user->isSuperAdmin()) {
+                return true;
+            }
+
+            return null;
+        });
+
+        Gate::define('manageUserPermissions', function (User $actor, User $target, int $venueId): bool {
+            return app(UserPermissionPolicy::class)->manageUserPermissions($actor, $target, $venueId);
+        });
+
+        app(PermissionGateRegistrar::class)->registerAll();
+    }
+}
