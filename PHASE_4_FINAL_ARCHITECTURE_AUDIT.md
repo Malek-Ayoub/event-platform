@@ -159,21 +159,60 @@ These are **intentionally absent** from Phase 4 and must not be added until Phas
 
 ---
 
-## Git History (Phase 4 Financial + Infrastructure)
+## Git History (Phase 4)
 
 ```
 5248188  Project baseline before financial domain (through Phase 4.4a)
 d94dfac  Phase 4.4b — Payments and financial domain
-[pending] Phase 4.5 — Infrastructure domain
+f0d57f6  Phase 4.5 — Infrastructure domain and architecture audit
 ```
+
+---
+
+## Phase 5 Gates — ✅ Approved (98–99%)
+
+Documented in `IMPLEMENTATION_ROADMAP.md` §5.1–§5.9:
+
+| Gate | Rule |
+|------|------|
+| §5.1 | `TransactionRunner` only — no direct `DB::transaction()` in Domain Services |
+| §5.2 | **Aggregate Boundaries** table (Aggregate / Root / **Children**) |
+| §5.3 | **Service Ownership** table (Owns / **Cannot Modify**) |
+| §5.4 | No Model Events — Services only |
+| §5.5 | Outbox triple-write: data + ActivityLog + OutboxEvent in same transaction |
+| §5.6 | ActivityLog/Outbox: Domain Services only (official English rule) |
+| §5.7 | `PlatformSettingService` single writer (incl. tests) |
+| §5.8 | Execution batches 5.1→5.6 (TicketSerial before Order) |
+| §5.9 | `ServiceArchitectureGuardTest` at end of Phase 5 |
+
+**Final decision:** No architectural blockers. Aggregate Boundaries + Service Ownership fully documented.
 
 ---
 
 ## Recommendation
 
-1. **Review this audit** against `blueprint_v1_3.md` and `IMPLEMENTATION_ROADMAP.md`.
-2. **Resolve seating policies** (`ZonePolicy`, `VenueTablePolicy`, `TableSeatPolicy`) before or at the start of Phase 5 if seating APIs are in scope.
-3. **Proceed to Phase 5** only after explicit approval — Domain Services will build on this layer and retroactive model changes become costly.
+1. ~~Review this audit~~ ✅ Complete.
+2. ~~Phase 5 gates~~ ✅ Approved (§5.1–§5.9).
+3. **Seating policies** remain deferred — **does not block** Batch 5.1.
+4. **Begin Phase 5 Batch 5.1:** `TransactionRunner` → `ActivityLogService` → `OutboxService`.
+
+---
+
+## Phase 5 Readiness Scorecard
+
+| Area | Score |
+|------|------:|
+| Domain Models | 100% |
+| Relationships | 100% |
+| Policies | 98% |
+| RBAC | 99% |
+| Factories | 100% |
+| Architecture Tests | 100% |
+| Schema Consistency | 100% |
+| Separation of Concerns (Phase 4) | 100% |
+| **Phase 5 Readiness** | **✅ 98–99% Approved** |
+
+*§5.2 Aggregate Boundaries + §5.3 Service Ownership (Cannot Modify) now fully documented. Seating policies remain deferred.*
 
 ---
 

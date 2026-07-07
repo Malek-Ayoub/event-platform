@@ -61,8 +61,8 @@
 | 1 | **Infrastructure** | إعداد المشروع، الحزم، config، الطبقات الأساسية | ✅ |
 | 2 | **Core Traits & Tenancy Foundation** | `BelongsToVenue`, `TenantContext`, middleware subdomain/api_client | ✅ |
 | 3 | **Authentication** | Sanctum + sessions + password reset + Auth layer | ✅ |
-| 4 | **Domain Models & Authorization** | كل Eloquent Models + علاقات + Policies + RBAC كامل | ⏳ التالي |
-| 5 | **Domain Services** | Repositories, Services, Actions, Transactions, Domain Events, Outbox hooks | — |
+| 4 | **Domain Models & Authorization** | كل Eloquent Models + علاقات + Policies + RBAC كامل | ✅ |
+| 5 | **Domain Services** | `TransactionRunner`, Services, Actions, DTOs (§5.1–§5.9) — **لا** Repository/CQRS/ES | ✅ جاهز للبدء |
 | 6 | **APIs (Business Controllers)** | Events, Ticket Types, Orders, Reservations, Products, Coupons, … | — |
 | 7 | **Payments** | Gateway, Webhooks, Refunds, Commission Adjustments | — |
 | 8 | **Notifications** | Email, SMS, Templates, Outbox Worker | — |
@@ -292,14 +292,231 @@
 
 #### Phase 5 — Domain Services
 
-**الهدف:** منطق الأعمال في Services/Actions — بدون HTTP layer.
+**الهدف:** منطق الأعمال في **Services / Actions / DTOs** — بدون HTTP layer.
 
-- Repositories (حيث يلزم).
-- Services + Actions + DTOs domain.
-- DB Transactions + pessimistic/optimistic locks (§58).
-- Domain Events + hooks لـ `outbox_events` (§57 — الكتابة داخل transaction؛ Worker لاحقًا Phase 8).
+**Prerequisites:** Phase 4 مكتمل ✅ + مراجعة `PHASE_4_FINAL_ARCHITECTURE_AUDIT.md` + الالتزام بقواعد **§5.1–§5.9** أدناه.
 
-**Prerequisites:** Phase 4 مكتمل.
+**Phase 5 Gates — ✅ معتمد (98–99% — توثيق مقفل):**
+
+| Gate | § |
+|------|---|
+| `TransactionRunner` (لا `DB::transaction` مباشرة) | §5.1 |
+| Aggregate Roots + Children | §5.2 |
+| Service Ownership + Cannot Modify | §5.3 |
+| No Model Events | §5.4 |
+| Outbox-first (Transaction = data + ActivityLog + Outbox) | §5.5 |
+| ActivityLog / Outbox write ownership | §5.6 |
+| PlatformSetting single writer | §5.7 |
+| Execution batches 5.1–5.6 | §5.8 |
+| Service Architecture Guard Tests | §5.9 |
+
+**ما لا يُضاف في Phase 5 (يُمنع — تعقيد بلا فائدة حالية):**
+- Repository Pattern كطبقة إلزامية
+- CQRS
+- Event Sourcing
+- DDD الكامل (Aggregates كـ classes منفصلة عن Eloquent)
+- Domain Events **داخل** Eloquent Models
+- Specifications معقدة
+- Command Bus / Mediator Pattern
+- Domain Objects / Value Objects **داخل** Eloquent Models (VOs عند **حدود** Service/DTO فقط — راجع Future Domain Value Objects)
+
+**ما يُضاف:**
+- Services + Actions + DTOs domain
+- `TransactionRunner` لكل تدفق يعدّل state (§5.1)
+- Pessimistic / optimistic locks حيث يلزم (§58)
+- `ActivityLogService` + `OutboxService` (§5.5–§5.6)
+- Read Models / Query Objects حيث يلزم (راجع Domain Read Models)
+- **Service Architecture Guard Tests** في نهاية Phase 5 (§5.9)
+
+---
+
+##### §5.1 — TransactionRunner (إلزامي — لا `DB::transaction` مباشرة)
+
+**لا يجوز** استدعاء `DB::transaction(...)` **مباشرة** داخل Domain Services.
+
+**كل Service** يعدّل حالة قاعدة البيانات يمر عبر **`TransactionRunner`**:
+
+```
+TransactionRunner
+    ↓
+OrderService / PaymentService / CommissionService / …
+```
+
+```php
+return $this->transactionRunner->run(function () {
+    // business logic + all persistence
+});
+```
+
+**فوائد:** Retry، deadlock retry، logging، metrics — في **مكان واحد** لاحقًا.
+
+**قواعد:**
+- **لا** أكثر من عملية حفظ (`save()`, `update()`, `delete()`, `create()`) **خارج** `TransactionRunner::run()`.
+- `lockForUpdate()` / optimistic `version` ضمن نفس الـ run.
+- **يُطبَّق إلزامًا على:** `OrderService`, `PaymentService`, `RefundService`, `CommissionService`, وجميع Domain Services.
+
+**Architecture Guard (§5.9):** لا `DB::transaction` في `app/Services/**` — فقط داخل `TransactionRunner`.
+
+---
+
+##### §5.2 — Aggregate Roots & Boundaries (جدول رسمي)
+
+**جدول Aggregate Boundaries** — أي مساهم يبدأ من هنا. عمود **Children** يحدد ما **لا يُعدَّل** إلا عبر Root:
+
+| Aggregate | Root | Children |
+|---|---|---|
+| **RBAC** | `User` | `UserPermission`, `RolePermission` |
+| **Events** | `Event` | `Category`, `TicketType`, `Zone`, `VenueTable`, `TableSeat`, `Reservation` |
+| **Commerce** | `Product` | `ProductVariant`, `Coupon`, `PromoCode` |
+| **Orders** | `Order` | `Ticket`, `TicketSerialCounter` |
+| **Payments** | `PaymentTransaction` | — *(قراءة `Refund` فقط؛ Refund aggregate منفصل)* |
+| **Refunds** | `Refund` | — *(`CommissionAdjustment` عبر Commission flow §52)* |
+| **Commission** | `Commission` | `CommissionAdjustment` |
+| **Venues** | `Venue` | `VenueUser`, `ApiClient` |
+| **Financial Settings** | `TaxRate` | — |
+| **Platform** | `PlatformSetting` | — |
+| **Notifications** *(Phase 8)* | `Notification` | `EmailTemplate`, `SmsTemplate` |
+
+**قواعد Aggregate:**
+- Services **لا تعدّل Children** إلا عبر **Root Service** للنطاق.
+- قراءة Models خارج النطاق **مسموحة** (validation, pricing) — **تعديلها ممنوع**.
+- مثال: `OrderService` **يقرأ** `Event`, `TicketType`, `Coupon` — **لا يعدّلها**.
+
+---
+
+##### §5.3 — Service Ownership (Owns + Cannot Modify)
+
+**جدول Service Ownership** — يمنع تداخل الخدمات مع مرور الوقت:
+
+| Service | Owns | Cannot Modify |
+|---|---|---|
+| `OrderService` | `Order`, `Ticket`, `TicketSerialCounter` | `PaymentTransaction`, `Refund`, `Commission` |
+| `TicketService` | `Ticket` *(via `OrderService` orchestration)* | `PaymentTransaction`, `Order` *(status transitions عبر OrderService)* |
+| `TicketSerialService` | `TicketSerialCounter` *(via `OrderService`)* | أي aggregate آخر |
+| `PaymentService` | `PaymentTransaction` | `Order` *(status — عبر orchestration)*, `Commission` |
+| `RefundService` | `Refund` | `Commission`, `Order` |
+| `CommissionService` | `Commission`, `CommissionAdjustment` | `Order`, `Refund`, `PaymentTransaction` |
+| `EventService` | `Event`, `Category`, `TicketType`, `Zone`, `VenueTable`, `TableSeat` | `Order`, `PaymentTransaction` |
+| `ReservationService` | `Reservation` | `Order`, `Ticket` |
+| `ProductService` | `Product`, `ProductVariant`, `Coupon`, `PromoCode` | `Order`, `PaymentTransaction` |
+| `TaxRateService` | `TaxRate` | أي aggregate آخر |
+| `PlatformSettingService` | `PlatformSetting` | **أي Model آخر** |
+| `VenueService` | `Venue`, `ApiClient` | Orders, Payments, … |
+| `PermissionService` | `UserPermission` | `RolePermission` *(seed/sync فقط)* |
+| `ActivityLogService` | `ActivityLog` *(append insert)* | أي Model |
+| `OutboxService` | `OutboxEvent` *(append insert)* | أي Model |
+| `NotificationService` *(Phase 8)* | `Notification` | — *(consumer فقط من Outbox)* |
+| `WebhookService` *(Phase 7)* | `WebhookLog` | `PaymentTransaction` *(via PaymentService)* |
+
+**Orchestration:** إذا احتاج `OrderService` commission — يستدعي `CommissionService` ضمن **نفس** `TransactionRunner::run()` — **لا** يكتب في `commissions` مباشرة.
+
+---
+
+##### §5.4 — Domain Events: من Services فقط (لا Models)
+
+**Phase 4 قرار مقفل:** Models **Anemic** — **لا** `boot()`, `booted()`, `creating()`, `created()`, `updating()`, `updated()`, `deleting()`, `deleted()`.
+
+**Phase 5 يحافظ على ذلك:**
+- **ممنوع** `$dispatchesEvents` على Models.
+- **لا** Observers للأعمال في Phase 5 (Observers §59 → Phase 8).
+- Eloquent **للـ persistence + relations + scopes** فقط.
+
+---
+
+##### §5.5 — Outbox Pattern (إلزامي)
+
+**أي Service يغيّر حالة النظام** (خصوصًا مالي/طلبات) يجب أن يكتب **داخل نفس `TransactionRunner::run()`:**
+
+1. **البيانات** (Order, Ticket, Payment, …)
+2. **`ActivityLog`** (via `ActivityLogService`)
+3. **`OutboxEvent`** (via `OutboxService`)
+
+```
+TransactionRunner::run(
+    OrderService
+        → create Order
+        → create Tickets
+        → ActivityLogService::record(...)
+        → OutboxService::record(...)
+)
+        ↓ (async — Phase 8 Worker)
+    Notification → Email → SMS → Webhook
+```
+
+**ممنوع:**
+
+```
+OrderService → NotificationService   // ❌
+PaymentService → Mail::send()        // ❌
+```
+
+**Architecture Guard (§5.9):** لا استدعاء `NotificationService` / `Mail` / `Sms` من Services التي تعدّل بيانات مالية — `OutboxEvent` فقط.
+
+---
+
+##### §5.6 — ActivityLog & Outbox Ownership (قاعدة رسمية)
+
+> **Only Domain Services may create `ActivityLog` and `OutboxEvent` records. Models, Policies, Controllers, Observers, and Form Requests must never write to these tables directly.**
+
+**تفاصيل:**
+- Domain Services تستخدم **`ActivityLogService`** و **`OutboxService`** فقط — لا `ActivityLog::create()` مباشرة.
+- **ممنوع** من: Models, Policies, Controllers, Observers, Form Requests, Jobs *(إلا Outbox Worker consumer — Phase 8)*.
+- **الهدف:** مركزية Audit + Outbox — منع تشتت التسجيل.
+
+---
+
+##### §5.7 — PlatformSetting: Service writer واحد
+
+`PlatformSetting` يستخدم `HasOptimisticLock` (§58).
+
+**قواعد:**
+- **كل** التعديل عبر `PlatformSettingService` فقط.
+- **ممنوع** `PlatformSetting::save()` / `update()` من Controllers, Services أخرى، **وحتى اختبارات Services الأخرى** — استخدم `PlatformSettingService` أو factory للقراءة فقط.
+
+---
+
+##### §5.8 — ترتيب تنفيذ Phase 5 (_batches)
+
+| Batch | المكونات | ملاحظة |
+|---|---|---|
+| **5.1** | `TransactionRunner`, `ActivityLogService`, `OutboxService` | Foundation — **قبل أي business service** |
+| **5.2** | `TicketSerialService`, `TicketService`, `OrderService` | Serial **قبل** Order (dependency) |
+| **5.3** | `PaymentService`, `RefundService` | |
+| **5.4** | `CommissionService` | |
+| **5.5** | `PlatformSettingService` | |
+| **5.6** | Architecture Review + **Service Architecture Guard Tests** | §5.9 |
+
+*(Event, Product, Reservation, TaxRate, Venue Services — parallel بعد 5.1 حسب §1.2 granular)*
+
+كل batch ينتهي باختبارات خضراء قبل التالي.
+
+---
+
+##### §5.9 — Service Architecture Guard Tests (نهاية Phase 5)
+
+**مماثل لـ `FinancialDomainArchitectureTest`** — يتحقق من:
+
+| Rule | Guard |
+|---|---|
+| Transactions | جميع Domain Services تستخدم `TransactionRunner` — لا `DB::transaction()` مباشرة في `app/Services/**` |
+| Aggregate boundaries | Services لا تستدعي `save()`/`update()` على Models خارج **Owns** (§5.3) |
+| Outbox-first | لا `NotificationService` / `Mail` / `Sms` من financial/order services |
+| Audit/Outbox | `ActivityLog` / `OutboxEvent` تُنشأ فقط عبر `ActivityLogService` / `OutboxService` |
+| PlatformSetting | لا `PlatformSetting::save()` خارج `PlatformSettingService` |
+
+**ملف مقترح:** `tests/Unit/Services/ServiceArchitectureGuardTest.php`
+
+---
+
+**Policies مؤجّلة (Technical Debt — لا تمنع Phase 5):**
+
+| Policy | ملاحظة |
+|---|---|
+| `MediaPolicy`, `DocumentPolicy` | Phase 21 |
+| `TicketPolicy`, `ApiClientPolicy` | Phase 6 |
+| `ZonePolicy`, `VenueTablePolicy`, `TableSeatPolicy` | قبل APIs الحجوزات (Phase 6) |
+
+**Phase 5 Readiness:** **✅ 98–99% — معتمد** — Aggregate Boundaries + Service Ownership موثّقان في §5.2–§5.3. **لا مانع** من بدء Batch 5.1.
 
 ---
 
@@ -1527,7 +1744,8 @@ tests/
 14. Production Hardening (Phase 9)
 
 **ملاحظات تنفيذية إلزامية:**
-- **لا تنتقل إلى Phase 5 (Services) أو Phase 6 (APIs) قبل اكتمال Phase 4** — Policies تعتمد على العلاقات.
+- **لا تنتقل إلى Phase 5 (Services) أو Phase 6 (APIs) قبل اكتمال Phase 4** — Policies تعتمد على العلاقات. ✅ Phase 4 مكتمل.
+- **Phase 5:** التزم بـ §5.1–§5.9 (`TransactionRunner`, Aggregate Boundaries, Service Ownership + Cannot Modify, Outbox triple-write, ActivityLog/Outbox ownership, PlatformSetting, Service Architecture Guard).
 - من Phase 5 فصاعدًا: كل domain event حرج يُسجَّل في `outbox_events` داخل نفس الـ transaction (§57).
 - لا تدمج مسار subdomain مع api_client (§53).
 - لا `version` على `orders`/`tickets`/`payment_transactions` (§58).
@@ -1562,7 +1780,7 @@ Domain & Authorization (§1.1)
 ☑ Phase 4.4a — Orders & Tickets (Order, Ticket, TicketSerialCounter)
 ☑ Phase 4.4b — Payments & Commissions (PaymentTransaction, Refund, Commission, CommissionAdjustment)
 ☑ Phase 4.5 — Infrastructure models + Architecture Review (قبل Phase 5)
-☐ Phase 5  — Domain Services (Repositories, Services, Actions, Transactions, Outbox hooks)
+☐ Phase 5  — Domain Services (§5.1–§5.9 — Batches 5.1→5.6)
 ☐ Phase 6  — APIs (Business Controllers: Events, Orders, Reservations, Products, …)
 ☐ Phase 7  — Payments (Gateway, Webhooks, Refunds, Commissions)
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
