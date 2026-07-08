@@ -873,12 +873,26 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 |---|---|---|
 | `PaymentService` | حالة الدفع **داخل النظام** (`PaymentTransaction`, `Order.status` SSOT) | استدعاء HTTP للـ Gateway، التحقق من التوقيع |
 | `RefundService` | حالة الاسترداد **داخل النظام** + `commission_adjustments` (§52) | استدعاء HTTP للـ Gateway |
-| `PaymentGatewayService` | التواصل مع مزود الدفع (initiate, capture, refund request) | `Model::save()`, `DB::`, ActivityLog, Outbox |
-| `WebhookService` | استقبال webhook، تنسيق pipeline، تفويض للـ GatewayService | معرفة HMAC/RSA (يُفوَّض لـ Verifier) |
+| `PaymentGatewayService` | **Anti-Corruption Layer** — التواصل مع مزود الدفع (initiate, capture, refund request, verify signature)؛ **الوحيد** المسموح له باستخدام `PaymentGatewayRegistry` + Gateway contracts | `Model::save()`, `DB::`, ActivityLog, Outbox |
+| `WebhookService` | استقبال webhook، تنسيق pipeline، تفويض **كل** تفاعل Gateway إلى `PaymentGatewayService` | `PaymentGatewayRegistry`, Gateway contracts, معرفة HMAC/RSA مباشرة |
 | `GatewaySignatureVerifier` *(interface)* | التحقق من التوقيع **فقط** | أي DB أو domain logic |
 | `ReplayProtectionService` | منع إعادة معالجة webhook (idempotency §51) | Cache-only؛ يستخدم تخزينًا دائمًا |
 
 **يمنع** تضخم `PaymentService` بمنطق Gateway/Webhook.
+
+**قاعدة Registry Access (Anti-Corruption Layer):** `PaymentGatewayService` هو **الخدمة الوحيدة** المسموح لها باستخدام:
+
+- `PaymentGatewayRegistry`
+- `PaymentGateway` / `RefundGateway` / `GatewaySignatureVerifier`
+
+**يمنع** على: Controllers، `WebhookService`، `PaymentService`، `RefundService`، وأي Domain service آخر استدعاء Registry أو Gateway contracts مباشرة.
+
+```
+WebhookService → PaymentGatewayService → PaymentGatewayRegistry → Provider impl
+Controller     → PaymentGatewayService → …
+```
+
+**لا** `WebhookService → PaymentGatewayRegistry` ❌ — **لا** `Controller → PaymentGatewayRegistry` ❌
 
 ---
 
@@ -887,7 +901,7 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 ```
 HTTP Webhook Request
         ↓
-GatewaySignatureVerifier.verify()     ← per-provider impl (HMAC/RSA/…)
+PaymentGatewayService.verifySignature()  ← يستدعي GatewaySignatureVerifier عبر Registry
         ↓
 ReplayProtectionService.assertNotProcessed(provider, event_id)
         ↓
@@ -976,6 +990,8 @@ app/
 | Gateway / Webhook layer لا تستخدم `DB::` | ✅ |
 | Gateway لا يكتب `ActivityLog` / `OutboxEvent` | ✅ |
 | Gateway لا يستدعي `ActivityLogService` / `OutboxService` | ✅ |
+| **فقط** `PaymentGatewayService` يستخدم `PaymentGatewayRegistry` + Gateway contracts | ✅ (Phase 7.2 guard) |
+| Controllers / Domain services / `WebhookService` **لا** يستدعون Registry أو Gateway contracts | ✅ (Phase 7.2 guard) |
 | تغييرات `Order.status` / `PaymentTransaction.status` تمر عبر `PaymentService` أو `RefundService` فقط | ✅ |
 | `PaymentGatewayService` لا يستدعي `Model::save()` مباشرة | ✅ |
 

@@ -2,10 +2,11 @@
 
 namespace Tests\Unit\Payments\Gateway;
 
+use App\Contracts\Payments\Http\GatewayHttpResponse;
 use App\Enums\Payments\GatewayOutcome;
 use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
+use App\Services\Payments\Gateway\Support\GatewayProviderMetadata;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
-use Illuminate\Http\Client\Response;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -18,23 +19,23 @@ class GatewayResponseMapperTest extends TestCase
 
         $this->assertSame(
             GatewayOutcome::Success,
-            $mapper->classifyHttpResponse(new Response(new \GuzzleHttp\Psr7\Response(200)), []),
+            $mapper->classifyHttpResponse(new GatewayHttpResponse(200, []), []),
         );
         $this->assertSame(
             GatewayOutcome::Declined,
-            $mapper->classifyHttpResponse(new Response(new \GuzzleHttp\Psr7\Response(422)), ['error' => 'declined']),
+            $mapper->classifyHttpResponse(new GatewayHttpResponse(422, ['error' => 'declined']), ['error' => 'declined']),
         );
         $this->assertSame(
             GatewayOutcome::ProviderError,
-            $mapper->classifyHttpResponse(new Response(new \GuzzleHttp\Psr7\Response(503)), ['error' => 'down']),
+            $mapper->classifyHttpResponse(new GatewayHttpResponse(503, ['error' => 'down']), ['error' => 'down']),
         );
         $this->assertSame(
             GatewayOutcome::Timeout,
-            $mapper->classifyHttpResponse(new Response(new \GuzzleHttp\Psr7\Response(504)), ['error' => 'timeout']),
+            $mapper->classifyHttpResponse(new GatewayHttpResponse(504, ['error' => 'timeout']), ['error' => 'timeout']),
         );
         $this->assertSame(
             GatewayOutcome::Unknown,
-            $mapper->classifyHttpResponse(new Response(new \GuzzleHttp\Psr7\Response(200)), null),
+            $mapper->classifyHttpResponse(new GatewayHttpResponse(200, null), null),
         );
     }
 
@@ -57,5 +58,25 @@ class GatewayResponseMapperTest extends TestCase
             $this->assertSame(3, $config->retryAttempts);
             $this->assertSame(500, $config->retryDelayMs);
         }
+    }
+
+    #[Test]
+    public function provider_metadata_uses_canonical_keys(): void
+    {
+        $metadata = GatewayProviderMetadata::build(
+            provider: 'shamcash',
+            providerTransactionId: 'SC-TXN-1',
+            providerReference: 'SC-TXN-1',
+            providerStatus: 'pending',
+            raw: ['channel' => 'mobile'],
+        );
+
+        $this->assertSame([
+            'provider' => 'shamcash',
+            'provider_transaction_id' => 'SC-TXN-1',
+            'provider_reference' => 'SC-TXN-1',
+            'provider_status' => 'pending',
+            'raw' => ['channel' => 'mobile'],
+        ], $metadata);
     }
 }

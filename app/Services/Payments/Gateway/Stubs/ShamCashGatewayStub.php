@@ -9,8 +9,9 @@ use App\DTOs\Payments\Gateway\InitiatePaymentResponse;
 use App\DTOs\Payments\Gateway\RefundRequest;
 use App\DTOs\Payments\Gateway\RefundResponse;
 use App\Enums\Payments\GatewayOutcome;
+use App\Services\Payments\Gateway\Support\GatewayProviderMetadata;
 
-/** Phase 7.1 stub — no HTTP; replaced in Phase 7.2. */
+/** Phase 7.1 stub — no HTTP; kept for isolated tests. */
 final class ShamCashGatewayStub implements PaymentGateway, RefundGateway
 {
     public function provider(): string
@@ -20,22 +21,38 @@ final class ShamCashGatewayStub implements PaymentGateway, RefundGateway
 
     public function initiate(InitiatePaymentRequest $request): InitiatePaymentResponse
     {
+        $transactionId = 'shamcash-stub-'.$request->orderId;
+
         return new InitiatePaymentResponse(
-            providerTransactionId: 'shamcash-stub-'.$request->orderId,
+            providerTransactionId: $transactionId,
             status: 'pending',
             outcome: GatewayOutcome::Success,
             redirectUrl: null,
-            providerMetadata: ['stub' => true],
+            providerMetadata: GatewayProviderMetadata::build(
+                provider: $this->provider(),
+                providerTransactionId: $transactionId,
+                providerReference: $transactionId,
+                providerStatus: 'pending',
+                raw: ['stub' => true],
+            ),
         );
     }
 
     public function refund(RefundRequest $request): RefundResponse
     {
+        $refundId = $request->providerRefundId ?? 'shamcash-refund-stub-'.$request->providerTransactionId;
+
         return new RefundResponse(
-            providerRefundId: $request->providerRefundId ?? 'shamcash-refund-stub-'.$request->providerTransactionId,
+            providerRefundId: $refundId,
             status: 'pending',
             outcome: GatewayOutcome::Success,
-            providerMetadata: ['stub' => true],
+            providerMetadata: GatewayProviderMetadata::build(
+                provider: $this->provider(),
+                providerTransactionId: $request->providerTransactionId,
+                providerReference: $refundId,
+                providerStatus: 'pending',
+                raw: ['stub' => true],
+            ),
         );
     }
 }

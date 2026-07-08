@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments\Gateway\ShamCash;
 
+use App\Contracts\Payments\Http\GatewayHttpResponse;
 use App\Contracts\Payments\PaymentGateway;
 use App\Contracts\Payments\RefundGateway;
 use App\DTOs\Payments\Gateway\InitiatePaymentRequest;
@@ -12,7 +13,6 @@ use App\Enums\Payments\GatewayOutcome;
 use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
 use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
-use Illuminate\Http\Client\Response;
 use Throwable;
 
 final class ShamCashGateway implements PaymentGateway, RefundGateway
@@ -44,9 +44,11 @@ final class ShamCashGateway implements PaymentGateway, RefundGateway
             );
         } catch (Throwable $exception) {
             return $this->mapper->initiateFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $this->mapper->classifyTransportException($exception),
                 errorMessage: $exception->getMessage(),
+                providerReference: (string) $request->orderId,
             );
         }
 
@@ -80,6 +82,7 @@ final class ShamCashGateway implements PaymentGateway, RefundGateway
             );
         } catch (Throwable $exception) {
             return $this->mapper->refundFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $this->mapper->classifyTransportException($exception),
                 errorMessage: $exception->getMessage(),
@@ -89,70 +92,79 @@ final class ShamCashGateway implements PaymentGateway, RefundGateway
         return $this->mapRefundResponse($response, $request);
     }
 
-    private function mapInitiateResponse(Response $response, InitiatePaymentRequest $request): InitiatePaymentResponse
+    private function mapInitiateResponse(GatewayHttpResponse $response, InitiatePaymentRequest $request): InitiatePaymentResponse
     {
-        $body = $response->json();
-        $bodyArray = is_array($body) ? $body : null;
+        $bodyArray = $response->body;
         $outcome = $this->mapper->classifyHttpResponse($response, $bodyArray);
 
         if ($bodyArray === null) {
             return $this->mapper->initiateFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: GatewayOutcome::Unknown,
                 errorMessage: 'Non-JSON response from ShamCash',
-                httpStatus: $response->status(),
+                httpStatus: $response->status,
             );
         }
 
         if ($outcome !== GatewayOutcome::Success) {
             return $this->mapper->initiateFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $outcome,
                 errorMessage: (string) ($bodyArray['message'] ?? $bodyArray['error'] ?? 'Provider rejected payment initiation'),
                 providerTransactionId: (string) ($bodyArray['transaction_id'] ?? ''),
-                httpStatus: $response->status(),
-                extraMetadata: ['raw' => $bodyArray],
+                providerReference: (string) ($bodyArray['transaction_id'] ?? $request->orderId),
+                providerStatus: (string) ($bodyArray['status'] ?? 'failed'),
+                httpStatus: $response->status,
+                raw: $bodyArray,
             );
         }
 
         return $this->mapper->initiateSuccess(
+            provider: $this->provider(),
             providerTransactionId: (string) ($bodyArray['transaction_id'] ?? ''),
-            status: (string) ($bodyArray['status'] ?? 'pending'),
+            providerStatus: (string) ($bodyArray['status'] ?? 'pending'),
+            providerReference: (string) ($bodyArray['transaction_id'] ?? $request->orderId),
             redirectUrl: isset($bodyArray['redirect_url']) ? (string) $bodyArray['redirect_url'] : null,
-            providerMetadata: isset($bodyArray['meta']) && is_array($bodyArray['meta']) ? $bodyArray['meta'] : [],
+            raw: $bodyArray,
         );
     }
 
-    private function mapRefundResponse(Response $response, RefundRequest $request): RefundResponse
+    private function mapRefundResponse(GatewayHttpResponse $response, RefundRequest $request): RefundResponse
     {
-        $body = $response->json();
-        $bodyArray = is_array($body) ? $body : null;
+        $bodyArray = $response->body;
         $outcome = $this->mapper->classifyHttpResponse($response, $bodyArray);
 
         if ($bodyArray === null) {
             return $this->mapper->refundFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: GatewayOutcome::Unknown,
                 errorMessage: 'Non-JSON response from ShamCash',
-                httpStatus: $response->status(),
+                httpStatus: $response->status,
             );
         }
 
         if ($outcome !== GatewayOutcome::Success) {
             return $this->mapper->refundFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $outcome,
                 errorMessage: (string) ($bodyArray['message'] ?? $bodyArray['error'] ?? 'Provider rejected refund request'),
                 providerRefundId: (string) ($bodyArray['refund_id'] ?? $request->providerRefundId ?? ''),
-                httpStatus: $response->status(),
-                extraMetadata: ['raw' => $bodyArray],
+                providerStatus: (string) ($bodyArray['status'] ?? 'failed'),
+                httpStatus: $response->status,
+                raw: $bodyArray,
             );
         }
 
         return $this->mapper->refundSuccess(
+            provider: $this->provider(),
             providerRefundId: (string) ($bodyArray['refund_id'] ?? $request->providerRefundId ?? ''),
-            status: (string) ($bodyArray['status'] ?? 'pending'),
-            providerMetadata: isset($bodyArray['meta']) && is_array($bodyArray['meta']) ? $bodyArray['meta'] : [],
+            providerStatus: (string) ($bodyArray['status'] ?? 'pending'),
+            providerTransactionId: $request->providerTransactionId,
+            raw: $bodyArray,
         );
     }
 }

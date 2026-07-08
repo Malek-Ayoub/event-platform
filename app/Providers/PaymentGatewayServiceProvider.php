@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\Payments\Http\HttpClientInterface;
+use App\Services\Payments\Gateway\Http\Adapters\LaravelHttpClientAdapter;
 use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\Gateway\ShamCash\ShamCashGateway;
@@ -15,6 +17,7 @@ class PaymentGatewayServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(HttpClientInterface::class, LaravelHttpClientAdapter::class);
         $this->app->singleton(PaymentGatewayHttpClient::class);
         $this->app->singleton(GatewayResponseMapper::class);
 

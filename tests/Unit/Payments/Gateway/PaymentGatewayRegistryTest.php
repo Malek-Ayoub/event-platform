@@ -18,6 +18,7 @@ use App\Services\Payments\Gateway\ShamCash\ShamCashGateway;
 use App\Services\Payments\Gateway\ShamCash\ShamCashSignatureVerifier;
 use App\Services\Payments\Gateway\Stubs\ShamCashGatewayStub;
 use App\Services\Payments\Gateway\Stubs\SyriatelCashGatewayStub;
+use App\Services\Payments\Gateway\Support\GatewayProviderMetadata;
 use App\Services\Payments\Gateway\SyriatelCash\SyriatelCashGateway;
 use App\Services\Payments\Gateway\SyriatelCash\SyriatelCashSignatureVerifier;
 use Illuminate\Support\Facades\Http;
@@ -163,7 +164,15 @@ class PaymentGatewayRegistryTest extends TestCase
         $this->assertSame('pending', $response->status);
         $this->assertSame(GatewayOutcome::Success, $response->outcome);
         $this->assertSame('https://pay.shamcash.test/checkout/100', $response->redirectUrl);
-        $this->assertSame(['channel' => 'mobile'], $response->providerMetadata);
+        $this->assertSame('shamcash', $response->providerMetadata[GatewayProviderMetadata::PROVIDER]);
+        $this->assertSame('SC-TXN-100', $response->providerMetadata[GatewayProviderMetadata::PROVIDER_TRANSACTION_ID]);
+        $this->assertSame('pending', $response->providerMetadata[GatewayProviderMetadata::PROVIDER_STATUS]);
+        $this->assertSame([
+            'transaction_id' => 'SC-TXN-100',
+            'status' => 'pending',
+            'redirect_url' => 'https://pay.shamcash.test/checkout/100',
+            'meta' => ['channel' => 'mobile'],
+        ], $response->providerMetadata[GatewayProviderMetadata::RAW]);
     }
 
     #[Test]
@@ -193,7 +202,7 @@ class PaymentGatewayRegistryTest extends TestCase
         $this->assertSame('failed', $response->status);
         $this->assertSame(GatewayOutcome::Declined, $response->outcome);
         $this->assertSame('SC-TXN-ERR', $response->providerTransactionId);
-        $this->assertSame('Insufficient merchant balance', $response->providerMetadata['error']);
+        $this->assertSame('Insufficient merchant balance', $response->providerMetadata[GatewayProviderMetadata::RAW]['error']);
     }
 
     #[Test]
@@ -224,7 +233,12 @@ class PaymentGatewayRegistryTest extends TestCase
         $this->assertSame('SY-REF-55', $response->providerRefundId);
         $this->assertSame('completed', $response->status);
         $this->assertSame(GatewayOutcome::Success, $response->outcome);
-        $this->assertSame(['batch' => 'B-1'], $response->providerMetadata);
+        $this->assertSame('syriatel_cash', $response->providerMetadata[GatewayProviderMetadata::PROVIDER]);
+        $this->assertSame([
+            'refund_reference' => 'SY-REF-55',
+            'refund_status' => 'success',
+            'provider_data' => ['batch' => 'B-1'],
+        ], $response->providerMetadata[GatewayProviderMetadata::RAW]);
     }
 
     #[Test]

@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments\Gateway\SyriatelCash;
 
+use App\Contracts\Payments\Http\GatewayHttpResponse;
 use App\Contracts\Payments\PaymentGateway;
 use App\Contracts\Payments\RefundGateway;
 use App\DTOs\Payments\Gateway\InitiatePaymentRequest;
@@ -12,7 +13,6 @@ use App\Enums\Payments\GatewayOutcome;
 use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
 use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
-use Illuminate\Http\Client\Response;
 use Throwable;
 
 final class SyriatelCashGateway implements PaymentGateway, RefundGateway
@@ -44,9 +44,11 @@ final class SyriatelCashGateway implements PaymentGateway, RefundGateway
             );
         } catch (Throwable $exception) {
             return $this->mapper->initiateFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $this->mapper->classifyTransportException($exception),
                 errorMessage: $exception->getMessage(),
+                providerReference: (string) $request->orderId,
             );
         }
 
@@ -80,6 +82,7 @@ final class SyriatelCashGateway implements PaymentGateway, RefundGateway
             );
         } catch (Throwable $exception) {
             return $this->mapper->refundFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $this->mapper->classifyTransportException($exception),
                 errorMessage: $exception->getMessage(),
@@ -89,70 +92,83 @@ final class SyriatelCashGateway implements PaymentGateway, RefundGateway
         return $this->mapRefundResponse($response, $request);
     }
 
-    private function mapInitiateResponse(Response $response, InitiatePaymentRequest $request): InitiatePaymentResponse
+    private function mapInitiateResponse(GatewayHttpResponse $response, InitiatePaymentRequest $request): InitiatePaymentResponse
     {
-        $body = $response->json();
-        $bodyArray = is_array($body) ? $body : null;
+        $bodyArray = $response->body;
         $outcome = $this->mapper->classifyHttpResponse($response, $bodyArray);
 
         if ($bodyArray === null) {
             return $this->mapper->initiateFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: GatewayOutcome::Unknown,
                 errorMessage: 'Non-JSON response from Syriatel Cash',
-                httpStatus: $response->status(),
+                httpStatus: $response->status,
             );
         }
 
         if ($outcome !== GatewayOutcome::Success) {
             return $this->mapper->initiateFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $outcome,
                 errorMessage: (string) ($bodyArray['error_message'] ?? $bodyArray['message'] ?? 'Provider rejected payment initiation'),
                 providerTransactionId: (string) ($bodyArray['payment_reference'] ?? ''),
-                httpStatus: $response->status(),
-                extraMetadata: ['raw' => $bodyArray],
+                providerReference: (string) ($bodyArray['payment_reference'] ?? $request->orderId),
+                providerStatus: (string) ($bodyArray['payment_status'] ?? 'failed'),
+                httpStatus: $response->status,
+                raw: $bodyArray,
             );
         }
 
+        $providerStatus = (string) ($bodyArray['payment_status'] ?? 'pending');
+
         return $this->mapper->initiateSuccess(
+            provider: $this->provider(),
             providerTransactionId: (string) ($bodyArray['payment_reference'] ?? ''),
-            status: $this->normalizeStatus((string) ($bodyArray['payment_status'] ?? 'pending')),
+            providerStatus: $this->normalizeStatus($providerStatus),
+            providerReference: (string) ($bodyArray['payment_reference'] ?? $request->orderId),
             redirectUrl: isset($bodyArray['checkout_url']) ? (string) $bodyArray['checkout_url'] : null,
-            providerMetadata: isset($bodyArray['provider_data']) && is_array($bodyArray['provider_data']) ? $bodyArray['provider_data'] : [],
+            raw: $bodyArray,
         );
     }
 
-    private function mapRefundResponse(Response $response, RefundRequest $request): RefundResponse
+    private function mapRefundResponse(GatewayHttpResponse $response, RefundRequest $request): RefundResponse
     {
-        $body = $response->json();
-        $bodyArray = is_array($body) ? $body : null;
+        $bodyArray = $response->body;
         $outcome = $this->mapper->classifyHttpResponse($response, $bodyArray);
 
         if ($bodyArray === null) {
             return $this->mapper->refundFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: GatewayOutcome::Unknown,
                 errorMessage: 'Non-JSON response from Syriatel Cash',
-                httpStatus: $response->status(),
+                httpStatus: $response->status,
             );
         }
 
         if ($outcome !== GatewayOutcome::Success) {
             return $this->mapper->refundFailure(
+                provider: $this->provider(),
                 request: $request,
                 outcome: $outcome,
                 errorMessage: (string) ($bodyArray['error_message'] ?? $bodyArray['message'] ?? 'Provider rejected refund request'),
                 providerRefundId: (string) ($bodyArray['refund_reference'] ?? $request->providerRefundId ?? ''),
-                httpStatus: $response->status(),
-                extraMetadata: ['raw' => $bodyArray],
+                providerStatus: (string) ($bodyArray['refund_status'] ?? 'failed'),
+                httpStatus: $response->status,
+                raw: $bodyArray,
             );
         }
 
+        $providerStatus = (string) ($bodyArray['refund_status'] ?? 'pending');
+
         return $this->mapper->refundSuccess(
+            provider: $this->provider(),
             providerRefundId: (string) ($bodyArray['refund_reference'] ?? $request->providerRefundId ?? ''),
-            status: $this->normalizeStatus((string) ($bodyArray['refund_status'] ?? 'pending')),
-            providerMetadata: isset($bodyArray['provider_data']) && is_array($bodyArray['provider_data']) ? $bodyArray['provider_data'] : [],
+            providerStatus: $this->normalizeStatus($providerStatus),
+            providerTransactionId: $request->providerTransactionId,
+            raw: $bodyArray,
         );
     }
 

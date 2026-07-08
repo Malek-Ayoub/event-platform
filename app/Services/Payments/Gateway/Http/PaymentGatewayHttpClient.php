@@ -2,42 +2,33 @@
 
 namespace App\Services\Payments\Gateway\Http;
 
+use App\Contracts\Payments\Http\GatewayHttpResponse;
+use App\Contracts\Payments\Http\HttpClientInterface;
 use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Factory as HttpFactory;
-use Illuminate\Http\Client\Response;
 
 final class PaymentGatewayHttpClient
 {
     public function __construct(
-        private HttpFactory $http,
+        private HttpClientInterface $httpClient,
     ) {}
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function post(GatewayProviderConfig $config, string $path, array $payload): Response
+    public function post(GatewayProviderConfig $config, string $path, array $payload): GatewayHttpResponse
     {
         $url = rtrim($config->baseUrl, '/').'/'.ltrim($path, '/');
 
-        $pending = $this->http
-            ->acceptJson()
-            ->asJson()
-            ->withHeaders([
+        return $this->httpClient->post(
+            url: $url,
+            payload: $payload,
+            headers: [
                 'Authorization' => 'Bearer '.$config->apiKey,
-            ])
-            ->connectTimeout($config->connectTimeout)
-            ->timeout($config->requestTimeout);
-
-        if ($config->retryAttempts > 0) {
-            $pending = $pending->retry(
-                times: $config->retryAttempts,
-                sleepMilliseconds: $config->retryDelayMs,
-                when: static fn ($exception): bool => $exception instanceof ConnectionException,
-                throw: false,
-            );
-        }
-
-        return $pending->post($url, $payload);
+            ],
+            connectTimeout: $config->connectTimeout,
+            requestTimeout: $config->requestTimeout,
+            retryAttempts: $config->retryAttempts,
+            retryDelayMs: $config->retryDelayMs,
+        );
     }
 }
