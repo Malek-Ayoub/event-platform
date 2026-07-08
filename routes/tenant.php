@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
@@ -87,5 +88,11 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('orders', [OrderController::class, 'index'])->name('tenant.orders.index');
         Route::post('orders', [OrderController::class, 'store'])->name('tenant.orders.store');
         Route::get('orders/{order}', [OrderController::class, 'show'])->name('tenant.orders.show');
+
+        Route::get('payments', [PaymentController::class, 'index'])->name('tenant.payments.index');
+        Route::post('payments', [PaymentController::class, 'store'])->name('tenant.payments.store');
+        Route::get('payments/{paymentTransaction}', [PaymentController::class, 'show'])->name('tenant.payments.show');
+        Route::post('payments/{paymentTransaction}/complete', [PaymentController::class, 'complete'])->name('tenant.payments.complete');
+        Route::post('payments/{paymentTransaction}/fail', [PaymentController::class, 'fail'])->name('tenant.payments.fail');
     });
 });

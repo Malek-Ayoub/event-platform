@@ -14,6 +14,7 @@ use App\Services\Payments\Data\CompletePaymentData;
 use App\Services\Payments\Data\FailPaymentData;
 use App\Services\Payments\Data\InitiatePaymentData;
 use App\Services\TransactionRunner;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
 
 class PaymentService
@@ -24,6 +25,23 @@ class PaymentService
         private ActivityLogService $activityLogService,
         private OutboxService $outboxService,
     ) {}
+
+    public function list(int $perPage = 15, ?int $orderId = null, ?PaymentTransactionStatus $status = null): LengthAwarePaginator
+    {
+        return PaymentTransaction::query()
+            ->when($orderId !== null, fn ($query) => $query->where('order_id', $orderId))
+            ->when($status !== null, fn ($query) => $query->where('status', $status))
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+    }
+
+    public function getPayment(PaymentTransaction $payment): PaymentTransaction
+    {
+        return PaymentTransaction::query()
+            ->whereKey($payment->id)
+            ->with(['order'])
+            ->firstOrFail();
+    }
 
     public function initiatePayment(InitiatePaymentData $data): PaymentTransaction
     {
