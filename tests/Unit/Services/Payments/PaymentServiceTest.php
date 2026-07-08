@@ -180,6 +180,47 @@ class PaymentServiceTest extends TestCase
     }
 
     #[Test]
+    public function completing_payment_twice_is_fully_idempotent_for_side_effects(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $order = Order::factory()->forEvent($event)->create([
+            'total' => '100.00',
+            'subtotal' => '100.00',
+            'status' => OrderStatus::Pending,
+        ]);
+
+        $service = app(PaymentService::class);
+        $payment = $service->initiatePayment(new InitiatePaymentData(
+            orderId: $order->id,
+            provider: 'shamcash',
+            providerTransactionId: 'TXN-WEBHOOK-DUP',
+            amount: '100.00',
+            currency: 'USD',
+        ));
+
+        $service->completePayment(new CompletePaymentData($payment->id));
+        $service->completePayment(new CompletePaymentData($payment->id));
+
+        $this->assertSame(1, PaymentTransaction::query()->count());
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertSame(
+            1,
+            ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('action', 'completed')->count(),
+        );
+        $this->assertSame(
+            1,
+            OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'payment.completed')->count(),
+        );
+        $this->assertSame(
+            1,
+            OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'order.paid')->count(),
+        );
+    }
+
+    #[Test]
     public function completing_payment_twice_is_idempotent_for_order_status(): void
     {
         ['venue' => $venue] = $this->createVenueOwner();

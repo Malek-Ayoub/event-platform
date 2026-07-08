@@ -492,6 +492,42 @@ PaymentService → Mail::send()        // ❌
 
 ---
 
+##### §5.3.1 — Payment Domain Invariants (Phase 5.3+)
+
+**لا Partial Payments في v1.3:**
+- كل `PaymentTransaction` يجب أن يطابق `order.total` بالكامل.
+- `PaymentService::completePayment()` يحوّل `Order` من `pending` → `paid` **فقط** عند اكتمال الدفع الكامل.
+- **مستقبلًا** (إن دُعمت دفعات جزئية/عربون): لا يُحدَّث `Order.status = paid` إلا عندما `SUM(completed payments) >= order.total` — **خارج نطاق v1.3**.
+
+**Single Source of Truth — حالة الدفع:**
+- `PaymentTransaction.status` هو **مصدر الحقيقة الوحيد** لحالة الدفع.
+- `Order.status` (paid/failed/refunded) **حالة مشتقة** (derived business state) — تُحدَّث **فقط** عبر `PaymentService` / `RefundService` orchestration، **وليس** العكس.
+- **ممنوع** تحديث `Order → paid` مع بقاء `PaymentTransaction → failed`.
+
+**Refund invariant (يُفرض في `RefundService` فقط):**
+- `SUM(refunds WHERE status IN (pending, processed)) <= order.total` لكل طلب.
+- لا يعتمد على Controller — اختبار إلزامي: `$100` → refund `$80` → refund `$50` **مرفوض**.
+
+**Outbox envelope (§5.1+):** كل رسالة self-contained:
+```json
+{
+  "aggregate": "order",
+  "aggregate_id": 1,
+  "event": "order.paid",
+  "version": 1,
+  "occurred_at": "2026-07-08T12:00:00+00:00",
+  "payload": {}
+}
+```
+
+**Commission decoupling:** `PaymentService` **لا** يستدعي `CommissionService`. التدفق:
+```
+payment.completed (Outbox) → Worker (Phase 8) → CommissionService::recordCommission()
+```
+أو استدعاء صريح ضمن orchestration layer — **ليس** داخل `PaymentService`.
+
+---
+
 ##### §5.9 — Service Architecture Guard Tests (نهاية Phase 5)
 
 **مماثل لـ `FinancialDomainArchitectureTest`** — يتحقق من:

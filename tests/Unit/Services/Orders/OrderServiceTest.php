@@ -82,7 +82,8 @@ class OrderServiceTest extends TestCase
                 'subtotal' => $order->subtotal,
                 'total' => $order->total,
             ],
-        ], $outbox->payload);
+        ], array_diff_key($outbox->payload, ['occurred_at' => true]));
+        $this->assertArrayHasKey('occurred_at', $outbox->payload);
     }
 
     #[Test]

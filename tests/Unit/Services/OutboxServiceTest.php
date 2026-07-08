@@ -39,7 +39,9 @@ class OutboxServiceTest extends TestCase
             'event' => 'order.paid',
             'version' => 1,
             'payload' => ['order_id' => $order->id],
-        ], $outbox->payload);
+        ], array_diff_key($outbox->payload, ['occurred_at' => true]));
+        $this->assertArrayHasKey('occurred_at', $outbox->payload);
+        $this->assertNotEmpty($outbox->payload['occurred_at']);
         $this->assertTrue($outbox->status->value === 'pending');
         $this->assertSame(0, $outbox->attempts);
         $this->assertNull($outbox->processed_at);

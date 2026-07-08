@@ -44,6 +44,7 @@ class OutboxService extends BaseService
             'aggregate_id' => $this->aggregateId($aggregate),
             'event' => $eventType,
             'version' => $version,
+            'occurred_at' => now()->toIso8601String(),
             'payload' => $payload,
         ];
     }

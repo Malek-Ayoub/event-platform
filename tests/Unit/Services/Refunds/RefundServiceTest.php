@@ -129,6 +129,32 @@ class RefundServiceTest extends TestCase
     }
 
     #[Test]
+    public function it_rejects_cumulative_refunds_exceeding_order_total(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $order = Order::factory()->forEvent($event)->paid()->create([
+            'total' => '100.00',
+            'subtotal' => '100.00',
+        ]);
+
+        $service = app(RefundService::class);
+        $service->createRefund(new CreateRefundData(
+            orderId: $order->id,
+            amount: '80.00',
+        ));
+
+        $this->expectException(RefundAmountExceedsOrderException::class);
+
+        $service->createRefund(new CreateRefundData(
+            orderId: $order->id,
+            amount: '50.00',
+        ));
+    }
+
+    #[Test]
     public function it_rejects_refund_amount_exceeding_order_total(): void
     {
         ['venue' => $venue] = $this->createVenueOwner();
