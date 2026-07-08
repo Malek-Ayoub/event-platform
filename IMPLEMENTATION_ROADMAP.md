@@ -62,8 +62,8 @@
 | 2 | **Core Traits & Tenancy Foundation** | `BelongsToVenue`, `TenantContext`, middleware subdomain/api_client | ✅ |
 | 3 | **Authentication** | Sanctum + sessions + password reset + Auth layer | ✅ |
 | 4 | **Domain Models & Authorization** | كل Eloquent Models + علاقات + Policies + RBAC كامل | ✅ |
-| 5 | **Domain Services** | `TransactionRunner`, Services, Actions, DTOs (§5.1–§5.9) — **لا** Repository/CQRS/ES | ✅ جاهز للبدء |
-| 6 | **APIs (Business Controllers)** | Events, Ticket Types, Orders, Reservations, Products, Coupons, … | — |
+| 5 | **Domain Services** | `TransactionRunner`, Services, Actions, DTOs (§5.1–§5.9) — **لا** Repository/CQRS/ES | ✅ |
+| 6 | **APIs (Business Controllers)** | Events, Ticket Types, Orders, Reservations, Products, Coupons, … | ⏳ 6.1–6.2 ✅ |
 | 7 | **Payments** | Gateway, Webhooks, Refunds, Commission Adjustments | — |
 | 8 | **Notifications** | Email, SMS, Templates, Outbox Worker | — |
 | 9 | **Production Hardening** | Performance, Queues, Monitoring, Security, Load Testing | — |
@@ -599,46 +599,194 @@ API Resource (response shaping)
 
 كل endpoint يمر عبر `*Request` مخصص (`CreateOrderRequest`, `CompletePaymentRequest`, …).
 **ممنوع** `$request->validate([...])` داخل Controller.
+**ممنوع** إعادة استخدام Request واحدة لعدة عمليات مختلفة.
 
 ---
 
-##### §6.4 — ترتيب تنفيذ Phase 6 (_batches)
+##### §6.4 — Controller Ownership
 
-| Batch | المحتوى |
+كل Controller يملك **Aggregate / Domain واحد** فقط — لا orchestration بين Aggregates.
+
+| Controller | يملك |
 |---|---|
-| **6.1** | API Infrastructure (`BaseApiController`, `ApiResponse`, exception handler, `ApiResource`, pagination, DTO mapping) |
-| **6.2** | Authentication APIs (تنسيق Phase 3 بصيغتها النهائية) |
-| **6.3** | Event APIs |
-| **6.4** | Commerce APIs |
-| **6.5** | Order APIs |
-| **6.6** | Payment APIs |
-| **6.7** | Platform APIs |
-| **6.8** | OpenAPI/Swagger + **`ControllerArchitectureGuardTest`** |
+| `AuthController` / `PasswordController` | Authentication فقط |
+| `EventController` | Event Aggregate فقط (`Event`, `Category`, `TicketType` ضمن نفس الـ aggregate) |
+| `OrderController` | Order Aggregate فقط |
+| `PaymentController` | Payment فقط |
+| `RefundController` | Refund فقط |
+| `PlatformSettingController` | Platform Settings فقط |
+
+**قاعدة:**
+
+> لا يجوز لأي Controller استدعاء أكثر من **Domain Service واحد**، باستثناء خدمات البنية التحتية (Authorization hooks, Validation, Pagination helpers).
+
+**ممنوع في Controller:**
+- `createOrder()`, `purchase()`, `reserve()`, `pay()` داخل `EventController`
+- استدعاء `OrderService` من `EventController` (أو العكس)
+
+---
+
+##### §6.5 — API Resource Ownership
+
+كل Resource يمثل **Entity / Read Model واحد** — Mapping فقط، لا منطق.
+
+| Resource | يمثل |
+|---|---|
+| `EventResource` | `Event` فقط |
+| `CategoryResource` | `Category` فقط |
+| `TicketTypeResource` | `TicketType` فقط |
+| `OrderResource` | `Order` فقط |
+| `PaymentTransactionResource` | `PaymentTransaction` فقط |
+| `RefundResource` | `Refund` فقط |
+| `AuthenticatedUserResource` / `CurrentUserResource` | `User` (سياق Auth) |
+| `ApiTokenResource` | `TokenResultDTO` (session response) |
+
+**قاعدة:**
+
+> لا يجوز للـ Resource تنفيذ Queries، أو تحميل Relations (`$this->load(...)`), أو حساب Business Values (totals, commissions, availability).
+
+Resources تستقبل Read Models / DTOs / Models **محمّلة مسبقًا من Service** — وتُشكّل الـ public contract فقط.
+
+---
+
+##### §6.6 — Immutable DTOs
+
+**قاعدة رسمية لجميع DTOs (Phase 3+):**
+
+```
+DTOs immutable
+
+readonly properties only
+
+No methods except constructors / static factories (fromArray, …)
+```
+
+- **ممنوع:** setters، mutators، business methods، `toArray()` يُعيد حقولًا حساسة (passwords, tokens).
+- **نعم:** `readonly class`, `fromArray()`, constructor, `toArray()` للـ safe fields فقط.
+
+> DTOs ليست Models مصغّرة — هي **input/output contracts** بين HTTP layer و Services.
+
+---
+
+##### §6.7 — Unified Pagination Contract
+
+جميع list endpoints تستخدم نفس شكل الـ pagination عبر `ApiResponse::paginated()`:
+
+```json
+{
+  "data": [...],
+  "meta": {
+    "current_page": 1,
+    "per_page": 20,
+    "total": 500,
+    "last_page": 25,
+    "from": 1,
+    "to": 20,
+    "path": "https://..."
+  },
+  "links": {
+    "first": "...",
+    "last": "...",
+    "prev": null,
+    "next": "..."
+  }
+}
+```
+
+**لا** pagination shapes مخصصة per-controller.
+
+---
+
+##### §6.8 — ترتيب تنفيذ Phase 6 (_batches)
+
+| Batch | المحتوى | الحالة |
+|---|---|---|
+| **6.1** | API Infrastructure (`BaseApiController`, `ApiResponse`, exception handler, `ApiResource`, pagination, DTO mapping) | ✅ |
+| **6.2** | Authentication APIs (تنسيق Phase 3 بصيغتها النهائية) | ✅ |
+| **6.3** | Event APIs — **§6.11** | ✅ |
+| **6.4** | Commerce APIs | — |
+| **6.5** | Order APIs | — |
+| **6.6** | Payment APIs | — |
+| **6.7** | Platform APIs | — |
+| **6.8** | OpenAPI/Swagger + **`ControllerArchitectureGuardTest`** | — |
 
 كل batch ينتهي باختبارات خضراء قبل التالي.
 
 ---
 
-##### §6.5 — Controller Architecture Guard (Phase 6.8)
+##### §6.9 — Controller Architecture Guard (Phase 6.8)
 
 **ملف:** `tests/Feature/Architecture/ControllerArchitectureGuardTest.php`
 
 | Rule | Guard |
 |---|---|
-| Controller لا يستدعي Model مباشرة للـ mutation/query المعقد | ✅ |
+| Controller لا يستدعي Model مباشرة (`Model::query()`, `Model::create()`, `->save()`, …) | ✅ |
+| Controller لا يستخدم `DB` Facade (`DB::transaction()`, `DB::table()`, …) | ✅ |
 | Controller لا يستخدم `DB::transaction()` | ✅ |
 | Controller لا ينشئ `ActivityLog` / `OutboxEvent` | ✅ |
 | Controller لا يعيد Model مباشرة | ✅ |
 | Controller methods تستخدم FormRequest (حيث ينطبق) | ✅ |
 | Controller methods تعيد Resource / ApiResponse | ✅ |
+| Controller يرث `BaseApiController` | ✅ |
+| Controller لا يستخدم `response()->json()` مباشرة | ✅ |
+
+**تدريجي (Phase 6.2+):** `AuthControllerArchitectureTest` — يُدمج في Guard الكامل عند 6.8.
 
 **يكمل** `ServiceArchitectureGuardTest` (Phase 5.6).
 
 ---
 
-##### §6.6 — Payment SSOT (Guard extension — Phase 6.8)
+##### §6.10 — Payment SSOT (Guard extension — Phase 6.8)
 
 `ControllerArchitectureGuardTest` + `ServiceArchitectureGuardTest` يمنعان `Order.status = paid` خارج `PaymentService`.
+
+---
+
+##### §6.11 — Phase 6.3 Event APIs (نطاق مقفل)
+
+**Prerequisites:** Phase 6.1 ✅, Phase 6.2 ✅, Event models + policies (Phase 4.2).
+
+**EventController يدير فقط:**
+
+```
+Event
+Category
+TicketType
+```
+
+(ضمن Event Aggregate — لا cross-aggregate endpoints.)
+
+**لا يُضاف في EventController / Event batch:**
+
+- Order endpoints
+- Payment endpoints
+- Reservation endpoints
+- Ticket issuance / check-in endpoints
+
+**EventService boundaries (قبل كتابة Controller):**
+
+```
+EventService
+
+✓ create event
+✓ update event
+✓ publish event
+✓ archive event
+✓ category assignment
+✓ ticket types (CRUD ضمن aggregate)
+
+✗ reservations
+✗ orders
+✗ payments
+✗ commissions
+✗ notifications
+```
+
+**Exit Criteria (6.3):**
+- `EventController` يرث `BaseApiController` + Controller Ownership (§6.4)
+- FormRequest → DTO → `EventService` → Resource → `ApiResponse`
+- Pagination عبر §6.7
+- Feature tests + `EventControllerArchitectureTest` (تدريجي)
 
 ---
 
@@ -1862,7 +2010,8 @@ tests/
 
 **ملاحظات تنفيذية إلزامية:**
 - **لا تنتقل إلى Phase 5 (Services) أو Phase 6 (APIs) قبل اكتمال Phase 4** — Policies تعتمد على العلاقات. ✅ Phase 4 مكتمل.
-- **Phase 5:** التزم بـ §5.1–§5.9 (`TransactionRunner`, Aggregate Boundaries, Service Ownership + Cannot Modify, Outbox triple-write, ActivityLog/Outbox ownership, PlatformSetting, Service Architecture Guard).
+- **Phase 5:** التزم بـ §5.1–§5.9 (`TransactionRunner`, Aggregate Boundaries, Service Ownership + Cannot Modify, Outbox triple-write, ActivityLog/Outbox ownership, PlatformSetting, Service Architecture Guard). ✅
+- **Phase 6:** التزم بـ §6.1–§6.11 (Thin Controllers, Resource Ownership, Controller Ownership, Immutable DTOs, Unified Pagination, Controller Architecture Guard).
 - من Phase 5 فصاعدًا: كل domain event حرج يُسجَّل في `outbox_events` داخل نفس الـ transaction (§57).
 - لا تدمج مسار subdomain مع api_client (§53).
 - لا `version` على `orders`/`tickets`/`payment_transactions` (§58).
@@ -1897,8 +2046,11 @@ Domain & Authorization (§1.1)
 ☑ Phase 4.4a — Orders & Tickets (Order, Ticket, TicketSerialCounter)
 ☑ Phase 4.4b — Payments & Commissions (PaymentTransaction, Refund, Commission, CommissionAdjustment)
 ☑ Phase 4.5 — Infrastructure models + Architecture Review (قبل Phase 5)
-☐ Phase 5  — Domain Services (§5.1–§5.9 — Batches 5.1→5.6)
+☑ Phase 5  — Domain Services (§5.1–§5.9 — Batches 5.1→5.6)
 ☐ Phase 6  — APIs (Business Controllers: Events, Orders, Reservations, Products, …)
+  ☑ Phase 6.1 — API Infrastructure
+  ☑ Phase 6.2 — Authentication APIs
+  ☑ Phase 6.3 — Event APIs (§6.11)
 ☐ Phase 7  — Payments (Gateway, Webhooks, Refunds, Commissions)
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
 ☐ Phase 9  — Production Hardening
