@@ -63,8 +63,8 @@
 | 3 | **Authentication** | Sanctum + sessions + password reset + Auth layer | ✅ |
 | 4 | **Domain Models & Authorization** | كل Eloquent Models + علاقات + Policies + RBAC كامل | ✅ |
 | 5 | **Domain Services** | `TransactionRunner`, Services, Actions, DTOs (§5.1–§5.9) — **لا** Repository/CQRS/ES | ✅ |
-| 6 | **APIs (Business Controllers)** | Events, Ticket Types, Orders, Reservations, Products, Coupons, … | ⏳ 6.1–6.2 ✅ |
-| 7 | **Payments** | Gateway, Webhooks, Refunds, Commission Adjustments | — |
+| 6 | **APIs (Business Controllers)** | Events, Ticket Types, Orders, Reservations, Products, Coupons, … | ✅ 6.1–6.8 |
+| 7 | **Payments** | Gateway, Webhooks, Refunds, Commission Adjustments | ⏳ 7.1–7.5 |
 | 8 | **Notifications** | Email, SMS, Templates, Outbox Worker | — |
 | 9 | **Production Hardening** | Performance, Queues, Monitoring, Security, Load Testing | — |
 
@@ -839,12 +839,168 @@ EventService
 
 ---
 
-#### Phase 7 — Payments
+#### Phase 7 — Payment Gateway & Webhooks
 
-- Payment Gateway integration, `payment_transactions`.
-- Webhooks (signature §56, idempotency §51).
-- Refunds + `commission_adjustments` (§52).
-- Commissions (append-only amount).
+**Prerequisites:** Phase 5 ✅ (PaymentService, RefundService, CommissionService), Phase 6 ✅ (Payment APIs).
+
+**الهدف:** تكامل مزودي الدفع الخارجيين (ShamCash, Syriatel Cash, …) دون تلويث طبقة الأعمال. Phase 7 هي **أكثر مرحلة حساسية لسلامة البيانات** — الحدود تُثبَّت **قبل** كتابة أي كود.
+
+**المبدأ الحاكم:**
+
+```
+Gateway / Webhook Layer  →  Integration (لا DB mutations مباشرة)
+PaymentService / RefundService  →  Domain state (SSOT داخلي)
+ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
+```
+
+##### §7.0 — ترتيب تنفيذ Phase 7 (_batches)
+
+| Batch | المحتوى | يعتمد على | الحالة |
+|---|---|---|---|
+| **7.1** | Payment Gateway Abstractions (Interfaces + DTOs + Registry) | — | ✅ |
+| **7.2** | Gateway Implementations (ShamCash, Syriatel Cash, …) | 7.1 | — |
+| **7.3** | Webhook Infrastructure (Signature Verification + Replay Protection) | 7.2 | — |
+| **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | — |
+| **7.5** | End-to-End Integration + `GatewayArchitectureGuardTest` | 7.1–7.4 | — |
+
+كل batch ينتهي باختبارات خضراء قبل التالي.
+
+---
+
+##### §7.1 — Service Ownership (جدول مسؤوليات)
+
+| Service / Component | مسؤولية | **لا** يفعل |
+|---|---|---|
+| `PaymentService` | حالة الدفع **داخل النظام** (`PaymentTransaction`, `Order.status` SSOT) | استدعاء HTTP للـ Gateway، التحقق من التوقيع |
+| `RefundService` | حالة الاسترداد **داخل النظام** + `commission_adjustments` (§52) | استدعاء HTTP للـ Gateway |
+| `PaymentGatewayService` | التواصل مع مزود الدفع (initiate, capture, refund request) | `Model::save()`, `DB::`, ActivityLog, Outbox |
+| `WebhookService` | استقبال webhook، تنسيق pipeline، تفويض للـ GatewayService | معرفة HMAC/RSA (يُفوَّض لـ Verifier) |
+| `GatewaySignatureVerifier` *(interface)* | التحقق من التوقيع **فقط** | أي DB أو domain logic |
+| `ReplayProtectionService` | منع إعادة معالجة webhook (idempotency §51) | Cache-only؛ يستخدم تخزينًا دائمًا |
+
+**يمنع** تضخم `PaymentService` بمنطق Gateway/Webhook.
+
+---
+
+##### §7.2 — Webhook Pipeline (تدفق إلزامي)
+
+```
+HTTP Webhook Request
+        ↓
+GatewaySignatureVerifier.verify()     ← per-provider impl (HMAC/RSA/…)
+        ↓
+ReplayProtectionService.assertNotProcessed(provider, event_id)
+        ↓
+WebhookLog (received → verified)      ← webhook_logs UNIQUE(provider, provider_event_id) §51
+        ↓
+WebhookPayloadData (DTO)
+        ↓
+PaymentGatewayService.handleWebhook()
+        ↓
+PaymentService / RefundService          ← الوحيدان اللذان يغيّران domain state
+        ↓
+ActivityLogService + OutboxService    ← داخل TransactionRunner (Phase 5)
+        ↓
+WebhookLog (processed)
+```
+
+**قاعدة Phase 7:** **Gateway لا يغيّر Database مباشرة** — لا `Model::query()`, لا `save()`, لا `DB::transaction()` في طبقة Gateway/Webhook.
+
+**Routes:** `routes/webhooks.php` — **لا** tenant subdomain؛ ربط `venue_id` عند معالجة payment (§51).
+
+---
+
+##### §7.3 — Idempotency Keys (مقفلة)
+
+| Operation | Idempotency Key | Rule |
+|---|---|---|
+| `initiatePayment()` | `(order_id, provider)` | **عملية pending واحدة فعالة** لكل (order, provider) — لا orphaned TXs متعددة |
+| Webhook | `(provider, provider_event_id)` | يُعالج **مرة واحدة فقط** — `webhook_logs` UNIQUE §51 |
+| Refund (gateway) | `(provider_refund_id)` | مرة واحدة فقط لكل refund خارجي |
+| Commission adjustment | `refund_id` UNIQUE | **بدون تغيير** — append-only §52 |
+
+**Webhook replay:** لا Cache-only. استخدم `webhook_logs` (موجود: `provider`, `provider_event_id`, `status`, `created_at`).  
+`created_at` = `received_at`؛ أضف `processed_at` في batch 7.3 إذا لزم تمييز صريح.
+
+---
+
+##### §7.4 — Signature Verification
+
+```php
+interface GatewaySignatureVerifier
+{
+    public function verify(string $rawPayload, ?string $signatureHeader, array $config): void;
+}
+```
+
+- تنفيذ **لكل Gateway** (ShamCash, Syriatel Cash, …).
+- `WebhookService` **لا** يعرف خوارزمية HMAC/RSA — يستدعي Verifier من Registry فقط.
+- فشل التحقق → `WebhookVerificationException` (§56) — **لا** معالجة domain.
+
+---
+
+##### §7.5 — Gateway Abstractions (7.1 — هيكل مقترح)
+
+```
+app/
+├── Contracts/Payments/
+│   ├── PaymentGatewayInterface.php      # initiate, refund, parseWebhook
+│   └── GatewaySignatureVerifier.php
+├── Services/Payments/Gateway/
+│   ├── PaymentGatewayRegistry.php       # provider → gateway + verifier
+│   ├── PaymentGatewayService.php        # orchestration (7.4)
+│   ├── ShamCash/
+│   │   ├── ShamCashGateway.php
+│   │   └── ShamCashSignatureVerifier.php
+│   └── SyriatelCash/
+│       ├── SyriatelCashGateway.php
+│       └── SyriatelCashSignatureVerifier.php
+├── Services/Webhooks/
+│   ├── WebhookService.php
+│   └── ReplayProtectionService.php
+└── DTOs/Webhooks/
+    └── WebhookPayloadData.php
+```
+
+**Gateway Interface** — HTTP + parsing فقط؛ **لا** Eloquent.
+
+---
+
+##### §7.6 — Gateway Architecture Guard (Phase 7.5)
+
+**ملف:** `tests/Feature/Architecture/GatewayArchitectureGuardTest.php`
+
+| Rule | Guard |
+|---|---|
+| Gateway classes لا تستورد `App\Models\*` | ✅ |
+| Gateway / Webhook layer لا تستخدم `DB::` | ✅ |
+| Gateway لا يكتب `ActivityLog` / `OutboxEvent` | ✅ |
+| Gateway لا يستدعي `ActivityLogService` / `OutboxService` | ✅ |
+| تغييرات `Order.status` / `PaymentTransaction.status` تمر عبر `PaymentService` أو `RefundService` فقط | ✅ |
+| `PaymentGatewayService` لا يستدعي `Model::save()` مباشرة | ✅ |
+
+**يكمل** `ServiceArchitectureGuardTest` + `ControllerArchitectureGuardTest` (Phase 5.6 + 6.8).
+
+---
+
+##### §7.7 — Exit Criteria (Phase 7 كاملة)
+
+| # | Criterion |
+|---|---|
+| 1 | ShamCash + Syriatel Cash (أو mock gateways) مع Registry |
+| 2 | Webhook endpoint + signature verification + replay protection (DB-backed) |
+| 3 | E2E: webhook → PaymentService → Order paid + Outbox event |
+| 4 | Refund gateway flow → RefundService → commission_adjustment |
+| 5 | `GatewayArchitectureGuardTest` خضراء |
+| 6 | Idempotency keys §7.3 مُختبرة (duplicate webhook, duplicate refund) |
+
+---
+
+**محتوى Phase 7 (ملخص):**
+- Payment Gateway integration, `payment_transactions` (عبر PaymentService — SSOT).
+- Webhooks (signature §56, idempotency §51, replay §7.3).
+- Refunds + `commission_adjustments` (§52) — عبر RefundService.
+- Commissions (append-only) — بدون تغيير Phase 5 rules.
 
 ---
 
@@ -2053,7 +2209,8 @@ tests/
 **ملاحظات تنفيذية إلزامية:**
 - **لا تنتقل إلى Phase 5 (Services) أو Phase 6 (APIs) قبل اكتمال Phase 4** — Policies تعتمد على العلاقات. ✅ Phase 4 مكتمل.
 - **Phase 5:** التزم بـ §5.1–§5.9 (`TransactionRunner`, Aggregate Boundaries, Service Ownership + Cannot Modify, Outbox triple-write, ActivityLog/Outbox ownership, PlatformSetting, Service Architecture Guard). ✅
-- **Phase 6:** التزم بـ §6.1–§6.11 (Thin Controllers, Resource Ownership, Controller Ownership, Immutable DTOs, Unified Pagination, Controller Architecture Guard).
+- **Phase 6:** التزم بـ §6.1–§6.12 (Thin Controllers, OpenAPI projections, Architecture Guards). ✅
+- **Phase 7:** التزم بـ §7.0–§7.7 (Gateway/Webhook layer **لا DB**؛ domain state عبر PaymentService/RefundService فقط؛ Idempotency §7.3؛ GatewayArchitectureGuardTest).
 - من Phase 5 فصاعدًا: كل domain event حرج يُسجَّل في `outbox_events` داخل نفس الـ transaction (§57).
 - لا تدمج مسار subdomain مع api_client (§53).
 - لا `version` على `orders`/`tickets`/`payment_transactions` (§58).
@@ -2089,7 +2246,7 @@ Domain & Authorization (§1.1)
 ☑ Phase 4.4b — Payments & Commissions (PaymentTransaction, Refund, Commission, CommissionAdjustment)
 ☑ Phase 4.5 — Infrastructure models + Architecture Review (قبل Phase 5)
 ☑ Phase 5  — Domain Services (§5.1–§5.9 — Batches 5.1→5.6)
-☐ Phase 6  — APIs (Business Controllers: Events, Orders, Reservations, Products, …)
+☑ Phase 6  — APIs (Business Controllers) — §6.1–§6.12 ✅
   ☑ Phase 6.1 — API Infrastructure
   ☑ Phase 6.2 — Authentication APIs
   ☑ Phase 6.3 — Event APIs (§6.11)
@@ -2098,7 +2255,12 @@ Domain & Authorization (§1.1)
   ☑ Phase 6.6 — Payment APIs
   ☑ Phase 6.7 — Platform APIs
   ☑ Phase 6.8 — OpenAPI/Swagger + Architecture Guards
-☐ Phase 7  — Payments (Gateway, Webhooks, Refunds, Commissions)
+☐ Phase 7  — Payment Gateway & Webhooks (§7.0–§7.7)
+  ☑ Phase 7.1 — Gateway Abstractions (Interfaces + DTOs + Registry)
+  ☐ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)
+  ☐ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)
+  ☐ Phase 7.4 — PaymentGatewayService Orchestration
+  ☐ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
 ☐ Phase 9  — Production Hardening
 
