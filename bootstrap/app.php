@@ -1,5 +1,9 @@
 <?php
 
+use App\Exceptions\Handler\ApiExceptionRenderer;
+use App\Http\Middleware\ApiClientMiddleware;
+use App\Http\Middleware\CheckPermission;
+use App\Http\Middleware\TenantMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -27,13 +31,17 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'tenant' => \App\Http\Middleware\TenantMiddleware::class,
-            'api_client' => \App\Http\Middleware\ApiClientMiddleware::class,
-            'permission' => \App\Http\Middleware\CheckPermission::class,
+            'tenant' => TenantMiddleware::class,
+            'api_client' => ApiClientMiddleware::class,
+            'permission' => CheckPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            return app(ApiExceptionRenderer::class)->render($request, $exception);
+        });
     })->create();

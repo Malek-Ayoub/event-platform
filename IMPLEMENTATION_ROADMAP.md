@@ -558,13 +558,94 @@ payment.completed (Outbox) → Worker (Phase 8) → CommissionService::recordCom
 
 #### Phase 6 — APIs (Business Controllers)
 
-**الهدف:** HTTP layer فقط — Policies جاهزة مسبقًا.
+**الهدف:** HTTP layer فقط — Policies جاهزة مسبقًا. **Architecture Freeze** على طبقة Services (Phase 5) — Controllers تستدعي Services فقط.
 
+**Prerequisites:** Phase 5 مكتمل ✅
+
+---
+
+##### §6.1 — Thin Controllers (قاعدة رسمية)
+
+```
+Controller
+    ↓
+FormRequest (validation + authorization hooks)
+    ↓
+DTO (from validated input)
+    ↓
+Service (TransactionRunner + business logic)
+    ↓
+API Resource (response shaping)
+```
+
+**ممنوع داخل Controller:**
+- أي Query معقد (`Model::query()->where…`)
+- أي Business Logic
+- `DB::transaction()`
+- `ActivityLog` / `OutboxEvent` (مباشرة أو عبر Services غير Domain)
+- Policy bypass (`Gate::before`, `withoutMiddleware`, …)
+
+---
+
+##### §6.2 — API Resources فقط
+
+- **لا** إرجاع Eloquent Models مباشرة (`return $order` ❌).
+- **نعم** `OrderResource`, `OrderCollection`, `EventResource`, …
+- Resources تُشكّل الـ public contract — تغيير Schema الداخلي لا يكسر API.
+
+---
+
+##### §6.3 — Form Requests إلزامية
+
+كل endpoint يمر عبر `*Request` مخصص (`CreateOrderRequest`, `CompletePaymentRequest`, …).
+**ممنوع** `$request->validate([...])` داخل Controller.
+
+---
+
+##### §6.4 — ترتيب تنفيذ Phase 6 (_batches)
+
+| Batch | المحتوى |
+|---|---|
+| **6.1** | API Infrastructure (`BaseApiController`, `ApiResponse`, exception handler, `ApiResource`, pagination, DTO mapping) |
+| **6.2** | Authentication APIs (تنسيق Phase 3 بصيغتها النهائية) |
+| **6.3** | Event APIs |
+| **6.4** | Commerce APIs |
+| **6.5** | Order APIs |
+| **6.6** | Payment APIs |
+| **6.7** | Platform APIs |
+| **6.8** | OpenAPI/Swagger + **`ControllerArchitectureGuardTest`** |
+
+كل batch ينتهي باختبارات خضراء قبل التالي.
+
+---
+
+##### §6.5 — Controller Architecture Guard (Phase 6.8)
+
+**ملف:** `tests/Feature/Architecture/ControllerArchitectureGuardTest.php`
+
+| Rule | Guard |
+|---|---|
+| Controller لا يستدعي Model مباشرة للـ mutation/query المعقد | ✅ |
+| Controller لا يستخدم `DB::transaction()` | ✅ |
+| Controller لا ينشئ `ActivityLog` / `OutboxEvent` | ✅ |
+| Controller لا يعيد Model مباشرة | ✅ |
+| Controller methods تستخدم FormRequest (حيث ينطبق) | ✅ |
+| Controller methods تعيد Resource / ApiResponse | ✅ |
+
+**يكمل** `ServiceArchitectureGuardTest` (Phase 5.6).
+
+---
+
+##### §6.6 — Payment SSOT (Guard extension — Phase 6.8)
+
+`ControllerArchitectureGuardTest` + `ServiceArchitectureGuardTest` يمنعان `Order.status = paid` خارج `PaymentService`.
+
+---
+
+**محتوى APIs (§2 granular):**
 - Controllers, Form Requests, API Resources, Routes.
 - Events, Ticket Types, Orders, Reservations, Products, Coupons, Categories, Venues admin, Check-in, …
 - **لا** Payment webhooks هنا — Phase 7.
-
-**Prerequisites:** Phase 5 مكتمل.
 
 ---
 
