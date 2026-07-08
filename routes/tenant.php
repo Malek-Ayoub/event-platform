@@ -3,7 +3,11 @@
 use App\Domain\Tenancy\Contracts\TenantContextInterface;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductVariantController;
+use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\TicketTypeController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,5 +58,29 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('ticket-types/{ticketType}', [TicketTypeController::class, 'show'])->name('tenant.ticket-types.show');
         Route::put('ticket-types/{ticketType}', [TicketTypeController::class, 'update'])->name('tenant.ticket-types.update');
         Route::delete('ticket-types/{ticketType}', [TicketTypeController::class, 'destroy'])->name('tenant.ticket-types.destroy');
+
+        Route::get('products', [ProductController::class, 'index'])->name('tenant.products.index');
+        Route::post('products', [ProductController::class, 'store'])->name('tenant.products.store');
+        Route::get('products/{product}', [ProductController::class, 'show'])->name('tenant.products.show');
+        Route::put('products/{product}', [ProductController::class, 'update'])->name('tenant.products.update');
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('tenant.products.destroy');
+
+        Route::get('products/{product}/variants', [ProductVariantController::class, 'index'])->name('tenant.products.variants.index');
+        Route::post('products/{product}/variants', [ProductVariantController::class, 'store'])->name('tenant.products.variants.store');
+        Route::get('product-variants/{productVariant}', [ProductVariantController::class, 'show'])->name('tenant.product-variants.show');
+        Route::put('product-variants/{productVariant}', [ProductVariantController::class, 'update'])->name('tenant.product-variants.update');
+        Route::delete('product-variants/{productVariant}', [ProductVariantController::class, 'destroy'])->name('tenant.product-variants.destroy');
+
+        Route::get('coupons', [CouponController::class, 'index'])->name('tenant.coupons.index');
+        Route::post('coupons', [CouponController::class, 'store'])->name('tenant.coupons.store');
+        Route::get('coupons/{coupon}', [CouponController::class, 'show'])->name('tenant.coupons.show');
+        Route::put('coupons/{coupon}', [CouponController::class, 'update'])->name('tenant.coupons.update');
+        Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('tenant.coupons.destroy');
+
+        Route::get('promo-codes', [PromoCodeController::class, 'index'])->name('tenant.promo-codes.index');
+        Route::post('promo-codes', [PromoCodeController::class, 'store'])->name('tenant.promo-codes.store');
+        Route::get('promo-codes/{promoCode}', [PromoCodeController::class, 'show'])->name('tenant.promo-codes.show');
+        Route::put('promo-codes/{promoCode}', [PromoCodeController::class, 'update'])->name('tenant.promo-codes.update');
+        Route::delete('promo-codes/{promoCode}', [PromoCodeController::class, 'destroy'])->name('tenant.promo-codes.destroy');
     });
 });

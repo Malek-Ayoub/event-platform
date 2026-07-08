@@ -35,6 +35,8 @@ class ServiceArchitectureGuardTest extends TestCase
 
     /** @var list<string> */
     private array $domainServiceDirectories = [
+        'Events',
+        'Commerce',
         'Orders',
         'Payments',
         'Refunds',

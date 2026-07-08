@@ -704,7 +704,7 @@ No methods except constructors / static factories (fromArray, …)
 | **6.1** | API Infrastructure (`BaseApiController`, `ApiResponse`, exception handler, `ApiResource`, pagination, DTO mapping) | ✅ |
 | **6.2** | Authentication APIs (تنسيق Phase 3 بصيغتها النهائية) | ✅ |
 | **6.3** | Event APIs — **§6.11** | ✅ |
-| **6.4** | Commerce APIs | — |
+| **6.4** | Commerce APIs | ✅ |
 | **6.5** | Order APIs | — |
 | **6.6** | Payment APIs | — |
 | **6.7** | Platform APIs | — |
