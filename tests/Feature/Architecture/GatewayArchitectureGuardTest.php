@@ -11,8 +11,10 @@ use App\Services\Orders\OrderService;
 use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
+use App\Services\Payments\PaymentGatewayService;
 use App\Services\Payments\PaymentService;
 use App\Services\Refunds\RefundService;
+use App\Services\Webhooks\WebhookService;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
@@ -167,6 +169,32 @@ class GatewayArchitectureGuardTest extends TestCase
     }
 
     #[Test]
+    public function webhook_service_is_orchestrator_only(): void
+    {
+        $source = $this->sourceOf(WebhookService::class);
+
+        foreach ([
+            'PaymentGatewayRegistry',
+            'GatewaySignatureVerifier',
+            'PaymentService',
+            'RefundService',
+            'WebhookLogService',
+            'ReplayProtectionService',
+            'App\\Contracts\\Payments\\PaymentGateway',
+            'App\\Contracts\\Payments\\RefundGateway',
+            'App\\DTOs\\Payments\\Gateway\\',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString(
+                $forbidden,
+                $source,
+                "WebhookService must remain a thin orchestrator and must not reference {$forbidden}",
+            );
+        }
+
+        $this->assertStringContainsString('PaymentGatewayService', $source);
+    }
+
+    #[Test]
     public function payment_gateway_registry_has_no_business_logic_dependencies(): void
     {
         $source = $this->sourceOf(PaymentGatewayRegistry::class);
@@ -182,12 +210,10 @@ class GatewayArchitectureGuardTest extends TestCase
     private function discoverClassesForbiddenFromGatewayRegistryAccess(): array
     {
         $classes = [];
-        $allowed = array_filter([
+        $allowed = [
             PaymentGatewayServiceProvider::class,
-            class_exists('App\\Services\\Payments\\PaymentGatewayService')
-                ? 'App\\Services\\Payments\\PaymentGatewayService'
-                : null,
-        ]);
+            PaymentGatewayService::class,
+        ];
 
         foreach ([
             base_path('app/Http/Controllers'),

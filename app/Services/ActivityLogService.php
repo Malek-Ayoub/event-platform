@@ -28,6 +28,7 @@ class ActivityLogService extends BaseService
         return ActivityLog::query()->create([
             'venue_id' => $this->resolveVenueId($venueId, $entity),
             'actor_user_id' => $actor?->id,
+            'correlation_id' => $this->correlationContext->get(),
             'entity_type' => $this->entityType($entity),
             'entity_id' => $this->entityId($entity),
             'action' => $action,

@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property array<string, mixed>|null $old_values
  * @property array<string, mixed>|null $new_values
  * @property list<string>|null $changed_fields
+ * @property string|null $correlation_id
  * @property string|null $ip_address
  */
 class ActivityLog extends Model
@@ -31,6 +32,7 @@ class ActivityLog extends Model
     protected $fillable = [
         'venue_id',
         'actor_user_id',
+        'correlation_id',
         'entity_type',
         'entity_id',
         'action',
@@ -45,6 +47,7 @@ class ActivityLog extends Model
         return [
             'venue_id' => 'integer',
             'actor_user_id' => 'integer',
+            'correlation_id' => 'string',
             'entity_type' => 'string',
             'entity_id' => 'integer',
             'action' => 'string',

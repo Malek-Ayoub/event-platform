@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int|null $venue_id
+ * @property string|null $correlation_id
  * @property string $event_type
  * @property string $aggregate_type
  * @property int $aggregate_id
@@ -30,6 +31,7 @@ class OutboxEvent extends Model
 
     protected $fillable = [
         'venue_id',
+        'correlation_id',
         'event_type',
         'aggregate_type',
         'aggregate_id',
@@ -43,6 +45,7 @@ class OutboxEvent extends Model
     {
         return [
             'venue_id' => 'integer',
+            'correlation_id' => 'string',
             'event_type' => 'string',
             'aggregate_type' => 'string',
             'aggregate_id' => 'integer',

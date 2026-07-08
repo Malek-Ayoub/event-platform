@@ -859,7 +859,7 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 |---|---|---|---|
 | **7.1** | Payment Gateway Abstractions (Interfaces + DTOs + Registry) | — | ✅ |
 | **7.2** | Gateway Implementations (ShamCash, Syriatel Cash, …) | 7.1 | ✅ |
-| **7.3** | Webhook Infrastructure (Signature Verification + Replay Protection) | 7.2 | — |
+| **7.3** | Webhook Infrastructure (Signature Verification + Replay Protection) | 7.2 | ✅ |
 | **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | — |
 | **7.5** | End-to-End Integration + `GatewayArchitectureGuardTest` | 7.1–7.4 | — |
 
@@ -873,10 +873,11 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 |---|---|---|
 | `PaymentService` | حالة الدفع **داخل النظام** (`PaymentTransaction`, `Order.status` SSOT) | استدعاء HTTP للـ Gateway، التحقق من التوقيع |
 | `RefundService` | حالة الاسترداد **داخل النظام** + `commission_adjustments` (§52) | استدعاء HTTP للـ Gateway |
-| `PaymentGatewayService` | **Anti-Corruption Layer** — التواصل مع مزود الدفع (initiate, capture, refund request, verify signature)؛ **الوحيد** المسموح له باستخدام `PaymentGatewayRegistry` + Gateway contracts | `Model::save()`, `DB::`, ActivityLog, Outbox |
-| `WebhookService` | استقبال webhook، تنسيق pipeline، تفويض **كل** تفاعل Gateway إلى `PaymentGatewayService` | `PaymentGatewayRegistry`, Gateway contracts, معرفة HMAC/RSA مباشرة |
-| `GatewaySignatureVerifier` *(interface)* | التحقق من التوقيع **فقط** | أي DB أو domain logic |
-| `ReplayProtectionService` | منع إعادة معالجة webhook (idempotency §51) | Cache-only؛ يستخدم تخزينًا دائمًا |
+| `PaymentGatewayService` | **Anti-Corruption Layer** — التواصل مع مزود الدفع (initiate, capture, refund request, verify signature, provider mapping)؛ **الوحيد** المسموح له باستخدام `PaymentGatewayRegistry` + Gateway contracts | `Model::save()`, `DB::`, ActivityLog, Outbox؛ **لا** `if ($provider === 'shamcash')` — انظر §7.4 |
+| `WebhookService` | **Orchestrator فقط** (مثل Controllers في Phase 6): استقبال HTTP → normalize → تفويض لـ `PaymentGatewayService` → HTTP response | التحقق من التوقيع، Replay Protection، `WebhookLog`، `PaymentService`، `RefundService`، تفسير payload المزود، Registry، Gateway contracts |
+| `WebhookLogService` | إنشاء وتحديث `webhook_logs` (append-only transitions §7.3.2) | Domain logic، استدعاء Gateway |
+| `GatewaySignatureVerifier` *(interface)* | التحقق من التوقيع **فقط** (via Registry — لا استدعاء مباشر من WebhookService) | أي DB أو domain logic |
+| `ReplayProtectionService` | منع إعادة معالجة webhook (idempotency §7.3.1) | Cache-only؛ يستخدم تخزينًا دائمًا |
 
 **يمنع** تضخم `PaymentService` بمنطق Gateway/Webhook.
 
@@ -894,28 +895,61 @@ Controller     → PaymentGatewayService → …
 
 **لا** `WebhookService → PaymentGatewayRegistry` ❌ — **لا** `Controller → PaymentGatewayRegistry` ❌
 
+**قاعدة WebhookService (Orchestrator Only — قبل كتابة Batch 7.3):**  
+`WebhookService` = orchestrator رفيع فقط — **لا God Service**. مسؤولياته:
+
+```
+Receive HTTP Request
+        ↓
+Normalize Request (provider slug, raw body, headers → DTO)
+        ↓
+PaymentGatewayService.handleWebhook(...)   ← كل منطق التكامل هنا
+        ↓
+Return HTTP Response
+```
+
+**يمنع** على `WebhookService`: التحقق من التوقيع، Replay Protection، كتابة `WebhookLog`، استدعاء `PaymentService` / `RefundService`، تفسير payload خاص بمزود.
+
 ---
 
-##### §7.2 — Webhook Pipeline (تدفق إلزامي)
+##### §7.2 — Webhook Pipeline (تدفق إلزامي — يُنفَّذ داخل `PaymentGatewayService` + خدمات مساعدة)
+
+**من منظور `WebhookService` (Orchestrator):**
 
 ```
 HTTP Webhook Request
         ↓
-PaymentGatewayService.verifySignature()  ← يستدعي GatewaySignatureVerifier عبر Registry
-        ↓
-ReplayProtectionService.assertNotProcessed(provider, event_id)
-        ↓
-WebhookLog (received → verified)      ← webhook_logs UNIQUE(provider, provider_event_id) §51
-        ↓
-WebhookPayloadData (DTO)
+WebhookService.receive()          ← normalize فقط
         ↓
 PaymentGatewayService.handleWebhook()
         ↓
-PaymentService / RefundService          ← الوحيدان اللذان يغيّران domain state
+HTTP Response
+```
+
+**من منظور `PaymentGatewayService` (Anti-Corruption Layer — التفاصيل الداخلية):**
+
+```
+PaymentGatewayService.handleWebhook()
         ↓
-ActivityLogService + OutboxService    ← داخل TransactionRunner (Phase 5)
+WebhookLogService.recordReceived()
         ↓
-WebhookLog (processed)
+PaymentGatewayService.verifySignature()   ← GatewaySignatureVerifier via Registry
+        ↓
+WebhookLogService.markVerified() | markFailedSignature()
+        ↓
+ReplayProtectionService.assertNotProcessed(provider, event_id)
+        ↓
+WebhookLogService.markReplayed()            ← on duplicate
+        ↓
+WebhookLogService.markProcessing()
+        ↓
+PaymentGatewayService.mapWebhookPayload() ← Gateway DTO → Domain DTO (§7.4)
+        ↓
+PaymentService / RefundService              ← الوحيدان اللذان يغيّران domain state
+        ↓
+ActivityLogService + OutboxService        ← داخل TransactionRunner (Phase 5)
+        ↓
+WebhookLogService.markProcessed() | markFailed()
 ```
 
 **قاعدة Phase 7:** **Gateway لا يغيّر Database مباشرة** — لا `Model::query()`, لا `save()`, لا `DB::transaction()` في طبقة Gateway/Webhook.
@@ -924,7 +958,27 @@ WebhookLog (processed)
 
 ---
 
-##### §7.3 — Idempotency Keys (مقفلة)
+##### §7.3 — Webhook Infrastructure (Batch 7.3 — تقسيم مسؤوليات)
+
+| Service | مسؤولية |
+|---|---|
+| `WebhookService` | Orchestrator فقط (§7.1) |
+| `PaymentGatewayService` | Signature verification + provider mapping + اختيار Gateway (via Registry) |
+| `ReplayProtectionService` | منع التكرار (DB-backed — `webhook_logs` UNIQUE) |
+| `WebhookLogService` | إنشاء وتحديث `webhook_logs` (transitions §7.3.2) |
+| `PaymentService` | تحديث المدفوعات (domain SSOT) |
+| `RefundService` | تحديث الاستردادات (domain SSOT) |
+
+**Exit criteria (Batch 7.3):**
+- Webhook route + `WebhookService` orchestrator (thin)
+- `PaymentGatewayService.handleWebhook()` ينسّق pipeline دون provider-specific `if`
+- `ReplayProtectionService` + `WebhookLogService`
+- Architecture guard: `WebhookService` لا يستورد Registry / Gateway contracts / Domain payment services
+- اختبارات: duplicate webhook → `replayed`؛ invalid signature → `failed_signature`
+
+---
+
+##### §7.3.1 — Idempotency Keys (مقفلة)
 
 | Operation | Idempotency Key | Rule |
 |---|---|---|
@@ -938,18 +992,75 @@ WebhookLog (processed)
 
 ---
 
-##### §7.4 — Signature Verification
+##### §7.3.2 — WebhookLog Status State Machine (مقفلة)
 
-```php
-interface GatewaySignatureVerifier
-{
-    public function verify(string $rawPayload, ?string $signatureHeader, array $config): void;
-}
+**الحالة الحالية (enum DB):** `received`, `verified`, `failed`, `processed` — **Batch 7.3** يوسّع إلى:
+
+| Status | معنى |
+|---|---|
+| `received` | HTTP webhook وصل وسُجّل |
+| `verified` | التوقيع صحيح |
+| `processing` | domain processing جاري |
+| `processed` | اكتمل بنجاح |
+| `failed_signature` | فشل التحقق من التوقيع |
+| `replayed` | duplicate `(provider, provider_event_id)` |
+| `failed` | فشل أثناء/بعد processing |
+
+**مسارات النجاح:**
+
+```
+received → verified → processing → processed
 ```
 
-- تنفيذ **لكل Gateway** (ShamCash, Syriatel Cash, …).
-- `WebhookService` **لا** يعرف خوارزمية HMAC/RSA — يستدعي Verifier من Registry فقط.
-- فشل التحقق → `WebhookVerificationException` (§56) — **لا** معالجة domain.
+**مسارات الخطأ:**
+
+```
+received → failed_signature
+verified → replayed
+processing → failed
+```
+
+**قواعد:**
+- `webhook_logs` append-only (لا `updated_at`) — transitions عبر `WebhookLogService` فقط
+- UNIQUE `(provider, provider_event_id)` يبقى SSOT لـ replay protection §51
+- `error_message` يُملأ عند `failed_signature`, `replayed`, `failed`
+
+---
+
+##### §7.4 — PaymentGatewayService Orchestration (Batch 7.4)
+
+**Anti-Corruption Layer — بدون provider-specific branching:**
+
+```
+Registry
+        ↓
+Gateway Contract (PaymentGateway / RefundGateway / GatewaySignatureVerifier)
+        ↓
+Gateway DTO
+        ↓
+Domain DTO
+        ↓
+PaymentService / RefundService
+```
+
+**يمنع** داخل `PaymentGatewayService`:
+
+```php
+if ($provider === 'shamcash') { ... }   // ❌
+match ($provider) { 'syriatel_cash' => ... };  // ❌
+```
+
+**يُسمح:** استدعاء Registry → contract method → map Gateway DTO إلى Domain DTO (mapper/generic strategy — **لا** hardcode per provider).
+
+**مسؤوليات Batch 7.4:**
+- `initiatePayment()` / `refund()` orchestration (HTTP API → Gateway → Domain)
+- Webhook payload mapping (Gateway DTO → Domain command/DTO)
+- **لا** `Model::save()` — يفوّض لـ `PaymentService` / `RefundService`
+
+**Signature verification (implemented via Registry in 7.3/7.4):**
+- `GatewaySignatureVerifier` per provider (ShamCash, Syriatel Cash, …) — already in Gateway layer (7.2)
+- `PaymentGatewayService` يستدعي Verifier من Registry فقط — **لا** HMAC/RSA في WebhookService
+- فشل التحقق → `WebhookVerificationException` (§56) — **لا** معالجة domain
 
 ---
 
@@ -960,18 +1071,20 @@ app/
 ├── Contracts/Payments/
 │   ├── PaymentGatewayInterface.php      # initiate, refund, parseWebhook
 │   └── GatewaySignatureVerifier.php
-├── Services/Payments/Gateway/
-│   ├── PaymentGatewayRegistry.php       # provider → gateway + verifier
-│   ├── PaymentGatewayService.php        # orchestration (7.4)
-│   ├── ShamCash/
-│   │   ├── ShamCashGateway.php
-│   │   └── ShamCashSignatureVerifier.php
-│   └── SyriatelCash/
-│       ├── SyriatelCashGateway.php
-│       └── SyriatelCashSignatureVerifier.php
+├── Services/Payments/
+│   ├── PaymentGatewayService.php       # ACL (7.3 webhook + 7.4 initiate/refund)
+│   └── Gateway/
+│       ├── PaymentGatewayRegistry.php
+│       ├── ShamCash/
+│       │   ├── ShamCashGateway.php
+│       │   └── ShamCashSignatureVerifier.php
+│       └── SyriatelCash/
+│           ├── SyriatelCashGateway.php
+│           └── SyriatelCashSignatureVerifier.php
 ├── Services/Webhooks/
-│   ├── WebhookService.php
-│   └── ReplayProtectionService.php
+│   ├── WebhookService.php              # orchestrator only (7.3)
+│   ├── WebhookLogService.php           # webhook_logs transitions (7.3)
+│   └── ReplayProtectionService.php     # DB-backed idempotency (7.3)
 └── DTOs/Webhooks/
     └── WebhookPayloadData.php
 ```
@@ -992,6 +1105,8 @@ app/
 | Gateway لا يستدعي `ActivityLogService` / `OutboxService` | ✅ |
 | **فقط** `PaymentGatewayService` يستخدم `PaymentGatewayRegistry` + Gateway contracts | ✅ (Phase 7.2 guard) |
 | Controllers / Domain services / `WebhookService` **لا** يستدعون Registry أو Gateway contracts | ✅ (Phase 7.2 guard) |
+| `WebhookService` orchestrator فقط — **لا** signature / replay / WebhookLog / PaymentService | ✅ (Phase 7.3 guard) |
+| `PaymentGatewayService` **لا** يحتوي provider-specific `if ($provider === …)` | ☐ (Phase 7.4 guard) |
 | تغييرات `Order.status` / `PaymentTransaction.status` تمر عبر `PaymentService` أو `RefundService` فقط | ✅ |
 | `PaymentGatewayService` لا يستدعي `Model::save()` مباشرة | ✅ |
 
@@ -2274,7 +2389,7 @@ Domain & Authorization (§1.1)
 ☐ Phase 7  — Payment Gateway & Webhooks (§7.0–§7.7)
   ☑ Phase 7.1 — Gateway Abstractions (Interfaces + DTOs + Registry)
   ☑ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)
-  ☐ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)
+  ☑ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)
   ☐ Phase 7.4 — PaymentGatewayService Orchestration
   ☐ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)

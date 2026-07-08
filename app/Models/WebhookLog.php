@@ -7,6 +7,7 @@ use Database\Factories\WebhookLogFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -15,7 +16,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $payload
  * @property string|null $signature
  * @property WebhookLogStatus $status
+ * @property string|null $correlation_id
  * @property string|null $error_message
+ * @property Carbon|null $processed_at
  */
 class WebhookLog extends Model
 {
@@ -27,10 +30,12 @@ class WebhookLog extends Model
     protected $fillable = [
         'provider',
         'provider_event_id',
+        'correlation_id',
         'payload',
         'signature',
         'status',
         'error_message',
+        'processed_at',
     ];
 
     protected function casts(): array
@@ -38,10 +43,12 @@ class WebhookLog extends Model
         return [
             'provider' => 'string',
             'provider_event_id' => 'string',
+            'correlation_id' => 'string',
             'payload' => 'string',
             'signature' => 'string',
             'status' => WebhookLogStatus::class,
             'error_message' => 'string',
+            'processed_at' => 'datetime',
         ];
     }
 

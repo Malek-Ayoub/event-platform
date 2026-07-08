@@ -74,7 +74,7 @@ class ApiExceptionRenderer
 
     private function shouldRender(Request $request): bool
     {
-        return $request->is('api/*') || $request->expectsJson();
+        return $request->is('api/*') || $request->is('webhooks/*') || $request->expectsJson();
     }
 
     private function domainExceptionStatus(Throwable $exception): ?int
@@ -96,8 +96,17 @@ class ApiExceptionRenderer
             || str_starts_with($class, 'App\\Exceptions\\Commissions\\')
             || str_starts_with($class, 'App\\Exceptions\\Events\\')
             || str_starts_with($class, 'App\\Exceptions\\PlatformSettings\\')
+            || str_starts_with($class, 'App\\Exceptions\\Webhooks\\UnsupportedWebhookEventException')
         ) {
             return 422;
+        }
+
+        if ($class === 'App\\Exceptions\\Webhooks\\WebhookVerificationException') {
+            return 401;
+        }
+
+        if ($class === 'App\\Exceptions\\Webhooks\\DuplicateWebhookException') {
+            return 200;
         }
 
         return null;

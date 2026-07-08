@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Tenancy\Contracts\ApiClientLookupInterface;
 use App\Domain\Tenancy\Contracts\VenueSubdomainLookupInterface;
 use App\Domain\Tenancy\Data\ResolvedApiClientData;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Support\Fakes\FakeApiClientLookup;
@@ -13,6 +14,8 @@ use Tests\TestCase;
 
 class ApplicationSmokeTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -92,15 +95,20 @@ class ApplicationSmokeTest extends TestCase
     }
 
     #[Test]
-    public function test_webhook_route_placeholder_is_registered(): void
+    public function test_webhook_route_is_registered(): void
     {
-        $response = $this->postJson('/webhooks/shamcash');
+        config(['payment_gateways.providers.shamcash.webhook_secret' => 'whsec_test']);
 
-        $response
-            ->assertStatus(501)
-            ->assertJson([
-                'message' => 'webhook route placeholder',
-                'provider' => 'shamcash',
-            ]);
+        $payload = [
+            'event_id' => 'evt_smoke',
+            'event_type' => 'payment.unknown_event',
+        ];
+        $rawBody = json_encode($payload, JSON_THROW_ON_ERROR);
+
+        $response = $this->postJson('/webhooks/shamcash', $payload, [
+            'X-ShamCash-Signature' => hash_hmac('sha256', $rawBody, 'whsec_test'),
+        ]);
+
+        $response->assertStatus(422);
     }
 }

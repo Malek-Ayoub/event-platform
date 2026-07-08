@@ -23,6 +23,7 @@ class OutboxService extends BaseService
     ): OutboxEvent {
         return OutboxEvent::query()->create([
             'venue_id' => $this->resolveVenueId($venueId, $aggregate),
+            'correlation_id' => $this->correlationContext->get(),
             'event_type' => $eventType,
             'aggregate_type' => $this->aggregateType($aggregate),
             'aggregate_id' => $this->aggregateId($aggregate),
