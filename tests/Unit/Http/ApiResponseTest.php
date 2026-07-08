@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Http;
 
-use App\Http\Resources\UserResource;
+use App\Http\Resources\Auth\CurrentUserResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -63,7 +63,7 @@ class ApiResponseTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->apiTestResponse(ApiResponse::resource(new UserResource($user)));
+        $response = $this->apiTestResponse(ApiResponse::resource(new CurrentUserResource($user)));
 
         $response
             ->assertOk()
@@ -75,7 +75,7 @@ class ApiResponseTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->apiTestResponse(ApiResponse::created(new UserResource($user)));
+        $response = $this->apiTestResponse(ApiResponse::created(new CurrentUserResource($user)));
 
         $response
             ->assertCreated()
@@ -115,7 +115,7 @@ class ApiResponseTest extends TestCase
         );
 
         /** @var AnonymousResourceCollection $collection */
-        $collection = UserResource::collection($paginator);
+        $collection = CurrentUserResource::collection($paginator);
 
         $response = $this->apiTestResponse(ApiResponse::paginated($collection, $paginator));
 

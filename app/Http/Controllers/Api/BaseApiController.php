@@ -43,4 +43,9 @@ abstract class BaseApiController extends Controller
     ): JsonResponse {
         return ApiResponse::paginated($collection, $paginator);
     }
+
+    protected function respondPlainMessage(string $message, int $status = 200): JsonResponse
+    {
+        return ApiResponse::plainMessage($message, $status);
+    }
 }

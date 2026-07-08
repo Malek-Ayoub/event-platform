@@ -105,4 +105,9 @@ class ApiResponse
 
         return response()->json($payload, $status);
     }
+
+    public static function plainMessage(string $message, int $status = 200): JsonResponse
+    {
+        return response()->json(['message' => $message], $status);
+    }
 }

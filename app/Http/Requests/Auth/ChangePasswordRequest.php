@@ -2,14 +2,24 @@
 
 namespace App\Http\Requests\Auth;
 
-use Illuminate\Foundation\Http\FormRequest;
+use App\DTOs\Auth\ChangePasswordDTO;
+use App\DTOs\BaseDTO;
+use App\Http\Requests\Api\BaseApiRequest;
 use Illuminate\Validation\Rules\Password;
 
-class ChangePasswordRequest extends FormRequest
+class ChangePasswordRequest extends BaseApiRequest
 {
     public function authorize(): bool
     {
         return $this->user() !== null;
+    }
+
+    /**
+     * @return class-string<BaseDTO>
+     */
+    protected function dtoClass(): ?string
+    {
+        return ChangePasswordDTO::class;
     }
 
     /**

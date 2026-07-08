@@ -3,131 +3,90 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Tenancy\Contracts\TenantContextInterface;
-use App\DTOs\Auth\LoginDTO;
-use App\DTOs\Auth\RegisterDTO;
-use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\CurrentUserRequest;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\LogoutAllRequest;
+use App\Http\Requests\Auth\LogoutRequest;
 use App\Http\Requests\Auth\RegisterRequest;
-use App\Http\Resources\TokenResource;
-use App\Http\Resources\UserResource;
-use App\Models\User;
+use App\Http\Requests\Auth\SendEmailVerificationRequest;
+use App\Http\Requests\Auth\VerifyEmailRequest;
+use App\Http\Resources\Auth\ApiTokenResource;
+use App\Http\Resources\Auth\CurrentUserResource;
 use App\Services\Auth\AuthService;
-use Illuminate\Auth\Events\Verified;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Services\Auth\EmailVerificationService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
-class AuthController extends Controller
+class AuthController extends BaseApiController
 {
     public function __construct(
         private readonly AuthService $authService,
+        private readonly EmailVerificationService $emailVerificationService,
         private readonly TenantContextInterface $tenantContext,
     ) {}
 
     public function register(RegisterRequest $request): JsonResponse
     {
-        $result = $this->authService->register(RegisterDTO::fromArray($request->validated()));
+        $result = $this->authService->register($request->toDto());
 
-        return (new TokenResource($result))->response()->setStatusCode(201);
+        return $this->respondCreated(new ApiTokenResource($result));
     }
 
-    public function login(LoginRequest $request): JsonResource
+    public function login(LoginRequest $request): JsonResponse
     {
-        $result = $this->authService->login(LoginDTO::fromArray($request->validated()));
+        $result = $this->authService->login($request->toDto());
 
-        return new TokenResource($result);
+        return $this->respondResource(new ApiTokenResource($result));
     }
 
-    public function tenantLogin(LoginRequest $request): JsonResource
+    public function tenantLogin(LoginRequest $request): JsonResponse
     {
-        $result = $this->authService->login(
-            LoginDTO::fromArray($request->validated()),
-            $this->tenantContext->requireVenueId(),
+        $venueId = $this->tenantContext->requireVenueId();
+        $result = $this->authService->login($request->toDto(), $venueId);
+
+        return $this->respondResource(
+            (new ApiTokenResource($result))->additional(['venue_id' => $venueId]),
         );
-
-        return (new TokenResource($result))->additional([
-            'venue_id' => $this->tenantContext->requireVenueId(),
-        ]);
     }
 
-    public function logout(Request $request): JsonResponse
+    public function logout(LogoutRequest $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        $this->authService->logout($request->user());
 
-        $this->authService->logout($user);
-
-        return response()->json([
-            'message' => 'Logged out successfully.',
-        ]);
+        return $this->respondPlainMessage('Logged out successfully.');
     }
 
-    public function logoutAll(Request $request): JsonResponse
+    public function logoutAll(LogoutAllRequest $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        $this->authService->logoutAll($request->user());
 
-        $this->authService->logoutAll($user);
-
-        return response()->json([
-            'message' => 'All sessions revoked successfully.',
-        ]);
+        return $this->respondPlainMessage('All sessions revoked successfully.');
     }
 
-    public function user(Request $request): UserResource
+    public function user(CurrentUserRequest $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
-
-        return new UserResource($user);
+        return $this->respondResource(new CurrentUserResource($request->user()));
     }
 
-    public function tenantUser(Request $request): JsonResource
+    public function tenantUser(CurrentUserRequest $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
-
-        return (new UserResource($user))->additional([
-            'venue_id' => $this->tenantContext->requireVenueId(),
-        ]);
+        return $this->respondResource(
+            (new CurrentUserResource($request->user()))->additional([
+                'venue_id' => $this->tenantContext->requireVenueId(),
+            ]),
+        );
     }
 
-    public function sendVerificationEmail(Request $request): JsonResponse
+    public function sendVerificationEmail(SendEmailVerificationRequest $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        $message = $this->emailVerificationService->sendNotification($request->user());
 
-        if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'message' => 'Email already verified.',
-            ]);
-        }
-
-        $user->sendEmailVerificationNotification();
-
-        return response()->json([
-            'message' => 'Verification link sent.',
-        ]);
+        return $this->respondPlainMessage($message);
     }
 
-    public function verifyEmail(EmailVerificationRequest $request): JsonResponse
+    public function verifyEmail(VerifyEmailRequest $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        $message = $this->emailVerificationService->verify($request->user());
 
-        if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'message' => 'Email already verified.',
-            ]);
-        }
-
-        if ($user->markEmailAsVerified()) {
-            event(new Verified($user));
-        }
-
-        return response()->json([
-            'message' => 'Email verified successfully.',
-        ]);
+        return $this->respondPlainMessage($message);
     }
 }

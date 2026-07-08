@@ -2,14 +2,24 @@
 
 namespace App\Http\Requests\Auth;
 
-use Illuminate\Foundation\Http\FormRequest;
+use App\DTOs\Auth\RegisterDTO;
+use App\DTOs\BaseDTO;
+use App\Http\Requests\Api\BaseApiRequest;
 use Illuminate\Validation\Rules\Password;
 
-class RegisterRequest extends FormRequest
+class RegisterRequest extends BaseApiRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * @return class-string<BaseDTO>
+     */
+    protected function dtoClass(): ?string
+    {
+        return RegisterDTO::class;
     }
 
     /**

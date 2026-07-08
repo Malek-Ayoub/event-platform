@@ -2,13 +2,23 @@
 
 namespace App\Http\Requests\Auth;
 
-use Illuminate\Foundation\Http\FormRequest;
+use App\DTOs\Auth\ForgotPasswordDTO;
+use App\DTOs\BaseDTO;
+use App\Http\Requests\Api\BaseApiRequest;
 
-class ForgotPasswordRequest extends FormRequest
+class ForgotPasswordRequest extends BaseApiRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * @return class-string<BaseDTO>
+     */
+    protected function dtoClass(): ?string
+    {
+        return ForgotPasswordDTO::class;
     }
 
     /**

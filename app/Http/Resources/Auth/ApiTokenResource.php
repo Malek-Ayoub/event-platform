@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Auth;
 
 use App\DTOs\Auth\TokenResultDTO;
+use App\Http\Resources\ApiResource;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
 /** @mixin TokenResultDTO */
-class TokenResource extends JsonResource
+class ApiTokenResource extends ApiResource
 {
     /**
      * @return array<string, mixed>
@@ -18,7 +18,7 @@ class TokenResource extends JsonResource
         $result = $this->resource;
 
         return [
-            'user' => new UserResource($result->user),
+            'user' => new AuthenticatedUserResource($result->user),
             'token' => $result->plainTextToken,
             'token_type' => $result->tokenType,
         ];

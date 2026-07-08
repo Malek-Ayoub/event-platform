@@ -2,13 +2,23 @@
 
 namespace App\Http\Requests\Auth;
 
-use Illuminate\Foundation\Http\FormRequest;
+use App\DTOs\Auth\LoginDTO;
+use App\DTOs\BaseDTO;
+use App\Http\Requests\Api\BaseApiRequest;
 
-class LoginRequest extends FormRequest
+class LoginRequest extends BaseApiRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * @return class-string<BaseDTO>
+     */
+    protected function dtoClass(): ?string
+    {
+        return LoginDTO::class;
     }
 
     /**
