@@ -14,6 +14,7 @@ use App\Services\Orders\Data\CreateOrderLineItemData;
 use App\Services\Orders\Data\ResolvedOrderLineItemData;
 use App\Services\OutboxService;
 use App\Services\TransactionRunner;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 
 class OrderService
@@ -24,6 +25,23 @@ class OrderService
         private ActivityLogService $activityLogService,
         private OutboxService $outboxService,
     ) {}
+
+    public function list(int $perPage = 15, ?int $eventId = null, ?OrderStatus $status = null): LengthAwarePaginator
+    {
+        return Order::query()
+            ->when($eventId !== null, fn ($query) => $query->where('event_id', $eventId))
+            ->when($status !== null, fn ($query) => $query->where('status', $status))
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+    }
+
+    public function getOrder(Order $order): Order
+    {
+        return Order::query()
+            ->whereKey($order->id)
+            ->with(['tickets', 'event'])
+            ->firstOrFail();
+    }
 
     public function createOrder(CreateOrderData $data): Order
     {

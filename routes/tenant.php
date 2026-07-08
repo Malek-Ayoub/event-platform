@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
@@ -82,5 +83,9 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('promo-codes/{promoCode}', [PromoCodeController::class, 'show'])->name('tenant.promo-codes.show');
         Route::put('promo-codes/{promoCode}', [PromoCodeController::class, 'update'])->name('tenant.promo-codes.update');
         Route::delete('promo-codes/{promoCode}', [PromoCodeController::class, 'destroy'])->name('tenant.promo-codes.destroy');
+
+        Route::get('orders', [OrderController::class, 'index'])->name('tenant.orders.index');
+        Route::post('orders', [OrderController::class, 'store'])->name('tenant.orders.store');
+        Route::get('orders/{order}', [OrderController::class, 'show'])->name('tenant.orders.show');
     });
 });
