@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PasswordController;
+use App\Http\Controllers\Api\PlatformSettingController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -42,4 +43,9 @@ Route::prefix('auth')->group(function (): void {
             ->middleware(['signed', 'throttle:6,1'])
             ->name('verification.verify');
     });
+});
+
+Route::middleware('auth:sanctum')->prefix('platform')->group(function (): void {
+    Route::get('settings', [PlatformSettingController::class, 'show'])->name('platform.settings.show');
+    Route::put('settings', [PlatformSettingController::class, 'update'])->name('platform.settings.update');
 });

@@ -707,7 +707,7 @@ No methods except constructors / static factories (fromArray, …)
 | **6.4** | Commerce APIs | ✅ |
 | **6.5** | Order APIs | ✅ |
 | **6.6** | Payment APIs | ✅ |
-| **6.7** | Platform APIs | — |
+| **6.7** | Platform APIs | ✅ |
 | **6.8** | OpenAPI/Swagger + **`ControllerArchitectureGuardTest`** | — |
 
 كل batch ينتهي باختبارات خضراء قبل التالي.

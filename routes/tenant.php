@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
+use App\Http\Controllers\Api\TaxRateController;
 use App\Http\Controllers\Api\TicketTypeController;
 use Illuminate\Support\Facades\Route;
 
@@ -94,5 +95,11 @@ Route::prefix('tenant')->group(function (): void {
         Route::get('payments/{paymentTransaction}', [PaymentController::class, 'show'])->name('tenant.payments.show');
         Route::post('payments/{paymentTransaction}/complete', [PaymentController::class, 'complete'])->name('tenant.payments.complete');
         Route::post('payments/{paymentTransaction}/fail', [PaymentController::class, 'fail'])->name('tenant.payments.fail');
+
+        Route::get('tax-rates', [TaxRateController::class, 'index'])->name('tenant.tax-rates.index');
+        Route::post('tax-rates', [TaxRateController::class, 'store'])->name('tenant.tax-rates.store');
+        Route::get('tax-rates/{taxRate}', [TaxRateController::class, 'show'])->name('tenant.tax-rates.show');
+        Route::put('tax-rates/{taxRate}', [TaxRateController::class, 'update'])->name('tenant.tax-rates.update');
+        Route::delete('tax-rates/{taxRate}', [TaxRateController::class, 'destroy'])->name('tenant.tax-rates.destroy');
     });
 });

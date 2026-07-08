@@ -37,6 +37,7 @@ class ServiceArchitectureGuardTest extends TestCase
     private array $domainServiceDirectories = [
         'Events',
         'Commerce',
+        'TaxRates',
         'Orders',
         'Payments',
         'Refunds',
