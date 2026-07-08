@@ -3,6 +3,7 @@
 namespace App\DTOs\Payments\Gateway;
 
 use App\DTOs\BaseDTO;
+use App\Enums\Payments\GatewayOutcome;
 
 readonly class RefundResponse extends BaseDTO
 {
@@ -12,6 +13,7 @@ readonly class RefundResponse extends BaseDTO
     public function __construct(
         public string $providerRefundId,
         public string $status,
+        public GatewayOutcome $outcome,
         public array $providerMetadata = [],
     ) {}
 
@@ -23,6 +25,9 @@ readonly class RefundResponse extends BaseDTO
         return new self(
             providerRefundId: (string) $data['provider_refund_id'],
             status: (string) $data['status'],
+            outcome: isset($data['outcome'])
+                ? GatewayOutcome::from((string) $data['outcome'])
+                : GatewayOutcome::Unknown,
             providerMetadata: isset($data['provider_metadata']) && is_array($data['provider_metadata'])
                 ? $data['provider_metadata']
                 : [],
@@ -34,6 +39,7 @@ readonly class RefundResponse extends BaseDTO
         return [
             'provider_refund_id' => $this->providerRefundId,
             'status' => $this->status,
+            'outcome' => $this->outcome->value,
             'provider_metadata' => $this->providerMetadata,
         ];
     }

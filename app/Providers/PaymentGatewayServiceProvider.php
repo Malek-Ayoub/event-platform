@@ -2,25 +2,30 @@
 
 namespace App\Providers;
 
+use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
-use App\Services\Payments\Gateway\Stubs\ShamCashGatewayStub;
-use App\Services\Payments\Gateway\Stubs\ShamCashSignatureVerifierStub;
-use App\Services\Payments\Gateway\Stubs\SyriatelCashGatewayStub;
-use App\Services\Payments\Gateway\Stubs\SyriatelCashSignatureVerifierStub;
+use App\Services\Payments\Gateway\ShamCash\ShamCashGateway;
+use App\Services\Payments\Gateway\ShamCash\ShamCashSignatureVerifier;
+use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
+use App\Services\Payments\Gateway\SyriatelCash\SyriatelCashGateway;
+use App\Services\Payments\Gateway\SyriatelCash\SyriatelCashSignatureVerifier;
 use Illuminate\Support\ServiceProvider;
 
 class PaymentGatewayServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(ShamCashGatewayStub::class);
-        $this->app->singleton(SyriatelCashGatewayStub::class);
-        $this->app->singleton(ShamCashSignatureVerifierStub::class);
-        $this->app->singleton(SyriatelCashSignatureVerifierStub::class);
+        $this->app->singleton(PaymentGatewayHttpClient::class);
+        $this->app->singleton(GatewayResponseMapper::class);
+
+        $this->app->singleton(ShamCashGateway::class);
+        $this->app->singleton(SyriatelCashGateway::class);
+        $this->app->singleton(ShamCashSignatureVerifier::class);
+        $this->app->singleton(SyriatelCashSignatureVerifier::class);
 
         $this->app->singleton(PaymentGatewayRegistry::class, function ($app): PaymentGatewayRegistry {
-            $shamCash = $app->make(ShamCashGatewayStub::class);
-            $syriatelCash = $app->make(SyriatelCashGatewayStub::class);
+            $shamCash = $app->make(ShamCashGateway::class);
+            $syriatelCash = $app->make(SyriatelCashGateway::class);
 
             return new PaymentGatewayRegistry(
                 paymentGateways: [
@@ -32,8 +37,8 @@ class PaymentGatewayServiceProvider extends ServiceProvider
                     $syriatelCash->provider() => $syriatelCash,
                 ],
                 signatureVerifiers: [
-                    $app->make(ShamCashSignatureVerifierStub::class)->provider() => $app->make(ShamCashSignatureVerifierStub::class),
-                    $app->make(SyriatelCashSignatureVerifierStub::class)->provider() => $app->make(SyriatelCashSignatureVerifierStub::class),
+                    $app->make(ShamCashSignatureVerifier::class)->provider() => $app->make(ShamCashSignatureVerifier::class),
+                    $app->make(SyriatelCashSignatureVerifier::class)->provider() => $app->make(SyriatelCashSignatureVerifier::class),
                 ],
             );
         });

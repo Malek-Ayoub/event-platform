@@ -858,7 +858,7 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 | Batch | المحتوى | يعتمد على | الحالة |
 |---|---|---|---|
 | **7.1** | Payment Gateway Abstractions (Interfaces + DTOs + Registry) | — | ✅ |
-| **7.2** | Gateway Implementations (ShamCash, Syriatel Cash, …) | 7.1 | — |
+| **7.2** | Gateway Implementations (ShamCash, Syriatel Cash, …) | 7.1 | ✅ |
 | **7.3** | Webhook Infrastructure (Signature Verification + Replay Protection) | 7.2 | — |
 | **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | — |
 | **7.5** | End-to-End Integration + `GatewayArchitectureGuardTest` | 7.1–7.4 | — |
@@ -2257,7 +2257,7 @@ Domain & Authorization (§1.1)
   ☑ Phase 6.8 — OpenAPI/Swagger + Architecture Guards
 ☐ Phase 7  — Payment Gateway & Webhooks (§7.0–§7.7)
   ☑ Phase 7.1 — Gateway Abstractions (Interfaces + DTOs + Registry)
-  ☐ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)
+  ☑ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)
   ☐ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)
   ☐ Phase 7.4 — PaymentGatewayService Orchestration
   ☐ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest

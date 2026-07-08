@@ -73,7 +73,7 @@ class GatewayArchitectureGuardTest extends TestCase
                 $this->assertStringNotContainsString(
                     $pattern,
                     $source,
-                    "{$class} must not reference {$pattern} in Phase 7.1",
+                    "{$class} must not reference {$pattern} in the gateway layer",
                 );
             }
         }
