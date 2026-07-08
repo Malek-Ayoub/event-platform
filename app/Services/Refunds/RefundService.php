@@ -14,6 +14,7 @@ use App\Services\ActivityLogService;
 use App\Services\OutboxService;
 use App\Services\Refunds\Data\CreateRefundData;
 use App\Services\Refunds\Data\ProcessRefundData;
+use App\Services\Refunds\Data\SubmitRefundData;
 use App\Services\TransactionRunner;
 
 class RefundService
@@ -152,6 +153,48 @@ class RefundService
                 payload: [
                     'order_id' => $refund->order_id,
                     'refund_id' => $refund->id,
+                    'amount' => $refund->amount,
+                ],
+            );
+
+            return $refund->fresh();
+        });
+    }
+
+    public function submitRefund(SubmitRefundData $data): Refund
+    {
+        return $this->transactionRunner->run(function () use ($data): Refund {
+            $refund = Refund::query()
+                ->whereKey($data->refundId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($refund->status !== RefundStatus::Pending) {
+                return $refund->fresh();
+            }
+
+            $refund->update(['provider_refund_id' => $data->providerRefundId]);
+
+            $this->activityLogService->record(
+                actor: $data->actor,
+                entity: $refund,
+                action: 'submitted',
+                newValues: [
+                    'order_id' => $refund->order_id,
+                    'provider_refund_id' => $data->providerRefundId,
+                    'status' => $refund->status->value,
+                ],
+                changedFields: ['provider_refund_id'],
+                ipAddress: $data->ipAddress,
+            );
+
+            $this->outboxService->record(
+                eventType: 'refund.submitted',
+                aggregate: $refund,
+                payload: [
+                    'order_id' => $refund->order_id,
+                    'refund_id' => $refund->id,
+                    'provider_refund_id' => $data->providerRefundId,
                     'amount' => $refund->amount,
                 ],
             );

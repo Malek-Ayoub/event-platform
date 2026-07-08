@@ -11,6 +11,10 @@ use App\Services\Payments\Gateway\ShamCash\ShamCashSignatureVerifier;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
 use App\Services\Payments\Gateway\SyriatelCash\SyriatelCashGateway;
 use App\Services\Payments\Gateway\SyriatelCash\SyriatelCashSignatureVerifier;
+use App\Services\Payments\Mapping\InitiatePaymentRequestMapper;
+use App\Services\Payments\Mapping\InitiatePaymentResponseMapper;
+use App\Services\Payments\Mapping\RefundRequestMapper;
+use App\Services\Payments\PaymentGatewayService;
 use Illuminate\Support\ServiceProvider;
 
 class PaymentGatewayServiceProvider extends ServiceProvider
@@ -25,6 +29,10 @@ class PaymentGatewayServiceProvider extends ServiceProvider
         $this->app->singleton(SyriatelCashGateway::class);
         $this->app->singleton(ShamCashSignatureVerifier::class);
         $this->app->singleton(SyriatelCashSignatureVerifier::class);
+        $this->app->singleton(InitiatePaymentRequestMapper::class);
+        $this->app->singleton(InitiatePaymentResponseMapper::class);
+        $this->app->singleton(RefundRequestMapper::class);
+        $this->app->singleton(PaymentGatewayService::class);
 
         $this->app->singleton(PaymentGatewayRegistry::class, function ($app): PaymentGatewayRegistry {
             $shamCash = $app->make(ShamCashGateway::class);

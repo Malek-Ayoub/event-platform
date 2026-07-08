@@ -3760,9 +3760,7 @@
             "InitiatePaymentRequest": {
                 "required": [
                     "order_id",
-                    "provider",
-                    "provider_transaction_id",
-                    "amount"
+                    "provider"
                 ],
                 "properties": {
                     "order_id": {
@@ -3775,23 +3773,20 @@
                         "example": "shamcash",
                         "maxLength": 50
                     },
-                    "provider_transaction_id": {
-                        "type": "string",
-                        "example": "TXN-12345",
-                        "maxLength": 255
-                    },
                     "amount": {
                         "type": "number",
                         "example": 150,
+                        "nullable": true,
                         "minimum": 0
                     },
                     "currency": {
                         "type": "string",
                         "example": "USD",
+                        "nullable": true,
                         "maxLength": 3,
                         "minLength": 3
                     },
-                    "payload": {
+                    "metadata": {
                         "type": "object",
                         "nullable": true
                     }

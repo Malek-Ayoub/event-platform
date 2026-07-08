@@ -2,10 +2,12 @@
 
 namespace App\Support\Webhooks;
 
+use App\Support\Correlation\ProviderCorrelation;
+
 final class WebhookCorrelation
 {
     public static function id(string $provider, string $providerEventId): string
     {
-        return strtolower(trim($provider)).':'.$providerEventId;
+        return ProviderCorrelation::id($provider, $providerEventId);
     }
 }

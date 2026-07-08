@@ -8,6 +8,7 @@ use App\Http\Requests\Payments\InitiatePaymentRequest;
 use App\Http\Requests\Payments\ListPaymentsRequest;
 use App\Http\Requests\Payments\ShowPaymentRequest;
 use App\Http\Resources\Payments\PaymentTransactionResource;
+use App\Services\Payments\PaymentGatewayService;
 use App\Services\Payments\PaymentService;
 use App\Support\Http\Payments\PaymentRequestMapper;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 class PaymentController extends BaseApiController
 {
     public function __construct(
+        private readonly PaymentGatewayService $paymentGatewayService,
         private readonly PaymentService $paymentService,
     ) {}
 
@@ -34,11 +36,18 @@ class PaymentController extends BaseApiController
 
     public function store(InitiatePaymentRequest $request): JsonResponse
     {
-        $payment = $this->paymentService->initiatePayment(
-            PaymentRequestMapper::toInitiatePaymentData($request->toDto(), $request->user(), $request->ip()),
+        $result = $this->paymentGatewayService->initiatePayment(
+            PaymentRequestMapper::toGatewayInitiatePaymentData($request->toDto(), $request->user(), $request->ip()),
         );
 
-        return $this->respondCreated(new PaymentTransactionResource($payment));
+        return (new PaymentTransactionResource($result->payment))
+            ->additional([
+                'meta' => array_filter([
+                    'redirect_url' => $result->redirectUrl,
+                ]),
+            ])
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(ShowPaymentRequest $request): JsonResponse

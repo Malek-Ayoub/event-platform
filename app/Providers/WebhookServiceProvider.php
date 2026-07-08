@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Services\Payments\PaymentGatewayService;
 use App\Services\Webhooks\Mappers\PaymentCompletedMapper;
 use App\Services\Webhooks\Mappers\PaymentFailedMapper;
 use App\Services\Webhooks\Mappers\RefundProcessedMapper;
@@ -34,7 +33,6 @@ class WebhookServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(PaymentGatewayService::class);
         $this->app->singleton(WebhookService::class);
     }
 }

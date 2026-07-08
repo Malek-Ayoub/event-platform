@@ -9,19 +9,18 @@ use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Services\Payments\Data\CompletePaymentData;
 use App\Services\Payments\Data\FailPaymentData;
-use App\Services\Payments\Data\InitiatePaymentData;
+use App\Services\Payments\Data\GatewayInitiatePaymentData;
 
 class PaymentRequestMapper
 {
-    public static function toInitiatePaymentData(InitiatePaymentDTO $dto, ?User $actor, ?string $ipAddress): InitiatePaymentData
+    public static function toGatewayInitiatePaymentData(InitiatePaymentDTO $dto, ?User $actor, ?string $ipAddress): GatewayInitiatePaymentData
     {
-        return new InitiatePaymentData(
+        return new GatewayInitiatePaymentData(
             orderId: $dto->orderId,
             provider: $dto->provider,
-            providerTransactionId: $dto->providerTransactionId,
             amount: $dto->amount,
             currency: $dto->currency,
-            payload: $dto->payload,
+            metadata: $dto->metadata,
             actor: $actor,
             ipAddress: $ipAddress,
         );

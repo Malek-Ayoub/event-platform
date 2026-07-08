@@ -860,7 +860,7 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 | **7.1** | Payment Gateway Abstractions (Interfaces + DTOs + Registry) | — | ✅ |
 | **7.2** | Gateway Implementations (ShamCash, Syriatel Cash, …) | 7.1 | ✅ |
 | **7.3** | Webhook Infrastructure (Signature Verification + Replay Protection) | 7.2 | ✅ |
-| **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | — |
+| **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | ✅ |
 | **7.5** | End-to-End Integration + `GatewayArchitectureGuardTest` | 7.1–7.4 | — |
 
 كل batch ينتهي باختبارات خضراء قبل التالي.
@@ -1052,10 +1052,11 @@ match ($provider) { 'syriatel_cash' => ... };  // ❌
 
 **يُسمح:** استدعاء Registry → contract method → map Gateway DTO إلى Domain DTO (mapper/generic strategy — **لا** hardcode per provider).
 
-**مسؤوليات Batch 7.4:**
+**مسؤوليات Batch 7.4:** ✅
 - `initiatePayment()` / `refund()` orchestration (HTTP API → Gateway → Domain)
 - Webhook payload mapping (Gateway DTO → Domain command/DTO)
 - **لا** `Model::save()` — يفوّض لـ `PaymentService` / `RefundService`
+- Mapper registry per event (`WebhookDomainCommandMapperRegistry`) + correlation ID عبر `WebhookLog` / `ActivityLog` / `OutboxEvent`
 
 **Signature verification (implemented via Registry in 7.3/7.4):**
 - `GatewaySignatureVerifier` per provider (ShamCash, Syriatel Cash, …) — already in Gateway layer (7.2)
@@ -1106,7 +1107,7 @@ app/
 | **فقط** `PaymentGatewayService` يستخدم `PaymentGatewayRegistry` + Gateway contracts | ✅ (Phase 7.2 guard) |
 | Controllers / Domain services / `WebhookService` **لا** يستدعون Registry أو Gateway contracts | ✅ (Phase 7.2 guard) |
 | `WebhookService` orchestrator فقط — **لا** signature / replay / WebhookLog / PaymentService | ✅ (Phase 7.3 guard) |
-| `PaymentGatewayService` **لا** يحتوي provider-specific `if ($provider === …)` | ☐ (Phase 7.4 guard) |
+| `PaymentGatewayService` **لا** يحتوي provider-specific `if ($provider === …)` | ✅ (Phase 7.4 guard) |
 | تغييرات `Order.status` / `PaymentTransaction.status` تمر عبر `PaymentService` أو `RefundService` فقط | ✅ |
 | `PaymentGatewayService` لا يستدعي `Model::save()` مباشرة | ✅ |
 
@@ -2390,7 +2391,7 @@ Domain & Authorization (§1.1)
   ☑ Phase 7.1 — Gateway Abstractions (Interfaces + DTOs + Registry)
   ☑ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)
   ☑ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)
-  ☐ Phase 7.4 — PaymentGatewayService Orchestration
+  ☑ Phase 7.4 — PaymentGatewayService Orchestration
   ☐ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
 ☐ Phase 9  — Production Hardening

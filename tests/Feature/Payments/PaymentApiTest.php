@@ -10,6 +10,7 @@ use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -61,10 +62,23 @@ class PaymentApiTest extends TestCase
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
         ['order' => $order] = $this->createPendingOrder($venue);
 
+        config([
+            'payment_gateways.providers.shamcash.base_url' => 'https://api.shamcash.test',
+            'payment_gateways.providers.shamcash.api_key' => 'test-key',
+            'payment_gateways.providers.shamcash.initiate_path' => '/v1/payments',
+        ]);
+
+        Http::fake([
+            'https://api.shamcash.test/v1/payments' => Http::response([
+                'transaction_id' => 'SC-TXN-API-001',
+                'status' => 'pending',
+                'redirect_url' => 'https://pay.shamcash.test/checkout/api-001',
+            ], 201),
+        ]);
+
         $initiate = $this->withToken($token)->postJson('/api/tenant/payments', [
             'order_id' => $order->id,
             'provider' => 'shamcash',
-            'provider_transaction_id' => 'TXN-API-001',
             'amount' => '120.00',
             'currency' => 'USD',
         ]);
@@ -72,7 +86,8 @@ class PaymentApiTest extends TestCase
         $initiate
             ->assertCreated()
             ->assertJsonPath('data.status', PaymentTransactionStatus::Pending->value)
-            ->assertJsonPath('data.provider_transaction_id', 'TXN-API-001');
+            ->assertJsonPath('data.provider_transaction_id', 'SC-TXN-API-001')
+            ->assertJsonPath('meta.redirect_url', 'https://pay.shamcash.test/checkout/api-001');
 
         $paymentId = $initiate->json('data.id');
 
@@ -146,10 +161,22 @@ class PaymentApiTest extends TestCase
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
         ['order' => $order] = $this->createPendingOrder($venue);
 
+        config([
+            'payment_gateways.providers.shamcash.base_url' => 'https://api.shamcash.test',
+            'payment_gateways.providers.shamcash.api_key' => 'test-key',
+            'payment_gateways.providers.shamcash.initiate_path' => '/v1/payments',
+        ]);
+
+        Http::fake([
+            'https://api.shamcash.test/v1/payments' => Http::response([
+                'transaction_id' => 'SC-TXN-BAD-AMT',
+                'status' => 'pending',
+            ], 201),
+        ]);
+
         $this->withToken($token)->postJson('/api/tenant/payments', [
             'order_id' => $order->id,
             'provider' => 'shamcash',
-            'provider_transaction_id' => 'TXN-BAD-AMT',
             'amount' => '99.00',
         ])->assertStatus(422);
     }
@@ -165,7 +192,6 @@ class PaymentApiTest extends TestCase
         $this->withToken($token)->postJson('/api/tenant/payments', [
             'order_id' => $foreignOrder->id,
             'provider' => 'shamcash',
-            'provider_transaction_id' => 'TXN-CROSS-TENANT',
             'amount' => $foreignOrder->total,
         ])
             ->assertUnprocessable()
@@ -206,7 +232,6 @@ class PaymentApiTest extends TestCase
         $this->withToken($token)->postJson('/api/tenant/payments', [
             'order_id' => $order->id,
             'provider' => 'shamcash',
-            'provider_transaction_id' => 'TXN-BLOCKED',
             'amount' => '120.00',
         ])->assertForbidden();
     }

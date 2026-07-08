@@ -11,6 +11,9 @@ use App\Services\Orders\OrderService;
 use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
+use App\Services\Payments\Mapping\InitiatePaymentRequestMapper;
+use App\Services\Payments\Mapping\InitiatePaymentResponseMapper;
+use App\Services\Payments\Mapping\RefundRequestMapper;
 use App\Services\Payments\PaymentGatewayService;
 use App\Services\Payments\PaymentService;
 use App\Services\Refunds\RefundService;
@@ -195,6 +198,97 @@ class GatewayArchitectureGuardTest extends TestCase
     }
 
     #[Test]
+    public function payment_gateway_service_has_no_provider_specific_branching(): void
+    {
+        $source = $this->sourceOf(PaymentGatewayService::class);
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$provider\s*===/',
+            $source,
+            'PaymentGatewayService must not branch on provider slug equality',
+        );
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/match\s*\(\s*\$.*provider/',
+            $source,
+            'PaymentGatewayService must not match on provider slug',
+        );
+
+        foreach (['shamcash', 'syriatel_cash', 'SyriatelCash', 'ShamCash'] as $providerLiteral) {
+            $this->assertStringNotContainsString(
+                "'{$providerLiteral}'",
+                $source,
+                'PaymentGatewayService must not hard-code provider names',
+            );
+        }
+    }
+
+    #[Test]
+    public function payment_gateway_registry_is_only_referenced_from_allowed_layers(): void
+    {
+        foreach ($this->discoverClassesForbiddenFromSymbol('PaymentGatewayRegistry') as $class) {
+            $this->assertStringNotContainsString(
+                'PaymentGatewayRegistry',
+                $this->sourceOf($class),
+                "{$class} must not reference PaymentGatewayRegistry — use PaymentGatewayService",
+            );
+        }
+    }
+
+    #[Test]
+    public function gateway_contracts_are_only_referenced_from_allowed_layers(): void
+    {
+        $forbiddenPatterns = [
+            'App\\Contracts\\Payments\\PaymentGateway',
+            'App\\Contracts\\Payments\\RefundGateway',
+            'App\\Contracts\\Payments\\GatewaySignatureVerifier',
+        ];
+
+        foreach ($this->discoverClassesForbiddenFromGatewayContracts() as $class) {
+            $source = $this->sourceOf($class);
+
+            foreach ($forbiddenPatterns as $pattern) {
+                $this->assertStringNotContainsString(
+                    $pattern,
+                    $source,
+                    "{$class} must not reference gateway contracts — use PaymentGatewayService",
+                );
+            }
+        }
+    }
+
+    #[Test]
+    public function gateway_mappers_are_pure_mapping_only(): void
+    {
+        $forbiddenPatterns = [
+            'App\\Models\\',
+            'config(',
+            'Config::',
+            'DB::',
+            'PaymentService',
+            'RefundService',
+            'OrderService',
+            'TransactionRunner',
+        ];
+
+        foreach ([
+            InitiatePaymentRequestMapper::class,
+            InitiatePaymentResponseMapper::class,
+            RefundRequestMapper::class,
+        ] as $class) {
+            $source = $this->sourceOf($class);
+
+            foreach ($forbiddenPatterns as $pattern) {
+                $this->assertStringNotContainsString(
+                    $pattern,
+                    $source,
+                    "{$class} must remain pure mapping without {$pattern}",
+                );
+            }
+        }
+    }
+
+    #[Test]
     public function payment_gateway_registry_has_no_business_logic_dependencies(): void
     {
         $source = $this->sourceOf(PaymentGatewayRegistry::class);
@@ -307,6 +401,113 @@ class GatewayArchitectureGuardTest extends TestCase
                 || $reflection->implementsInterface(GatewaySignatureVerifier::class)) {
                 $classes[] = $class;
             }
+        }
+
+        sort($classes);
+
+        return $classes;
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private function discoverClassesForbiddenFromSymbol(string $symbol): array
+    {
+        $classes = [];
+        $allowed = [
+            PaymentGatewayServiceProvider::class,
+            PaymentGatewayService::class,
+            PaymentGatewayRegistry::class,
+        ];
+
+        foreach ($this->discoverPhpClassesUnder(base_path('app')) as $class) {
+            if (in_array($class, $allowed, true)) {
+                continue;
+            }
+
+            if (str_starts_with($class, 'App\\Services\\Payments\\Gateway\\')) {
+                continue;
+            }
+
+            $classes[] = $class;
+        }
+
+        sort($classes);
+
+        return $classes;
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private function discoverClassesForbiddenFromGatewayContracts(): array
+    {
+        $classes = [];
+        $allowed = [
+            PaymentGatewayService::class,
+            PaymentGatewayRegistry::class,
+        ];
+
+        foreach ($this->discoverPhpClassesUnder(base_path('app')) as $class) {
+            if (in_array($class, $allowed, true)) {
+                continue;
+            }
+
+            if (str_starts_with($class, 'App\\Services\\Payments\\Gateway\\')) {
+                continue;
+            }
+
+            if (in_array($class, $this->gatewayContractClasses, true)) {
+                continue;
+            }
+
+            $classes[] = $class;
+        }
+
+        sort($classes);
+
+        return $classes;
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private function discoverPhpClassesUnder(string $directory): array
+    {
+        $classes = [];
+
+        if (! is_dir($directory)) {
+            return $classes;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory),
+        );
+
+        foreach ($iterator as $file) {
+            if (! $file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relative = str_replace(
+                [base_path('app').DIRECTORY_SEPARATOR, '.php', DIRECTORY_SEPARATOR],
+                ['', '', '\\'],
+                $file->getPathname(),
+            );
+
+            $class = 'App\\'.$relative;
+
+            if (! class_exists($class) && ! interface_exists($class)) {
+                continue;
+            }
+
+            $reflection = new ReflectionClass($class);
+
+            if ($reflection->isTrait()) {
+                continue;
+            }
+
+            $classes[] = $class;
         }
 
         sort($classes);
