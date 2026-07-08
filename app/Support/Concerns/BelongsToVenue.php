@@ -15,15 +15,17 @@ trait BelongsToVenue
         static::addGlobalScope(new BelongsToVenueScope);
 
         static::creating(function (Model $model): void {
-            if (! $model->getAttribute('venue_id')) {
-                $tenantContext = app(TenantContextInterface::class);
-
-                if (! $tenantContext->isResolved()) {
-                    throw new TenantNotResolvedException('Cannot create tenant-scoped model without resolved tenant context.');
-                }
-
-                $model->setAttribute('venue_id', $tenantContext->requireVenueId());
+            if (array_key_exists('venue_id', $model->getAttributes())) {
+                return;
             }
+
+            $tenantContext = app(TenantContextInterface::class);
+
+            if (! $tenantContext->isResolved()) {
+                throw new TenantNotResolvedException('Cannot create tenant-scoped model without resolved tenant context.');
+            }
+
+            $model->setAttribute('venue_id', $tenantContext->requireVenueId());
         });
     }
 
