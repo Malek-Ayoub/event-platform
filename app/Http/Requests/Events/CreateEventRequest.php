@@ -30,7 +30,7 @@ class CreateEventRequest extends BaseApiRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
-            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'category_id' => ['nullable', 'integer', $this->tenantExists('categories')],
             'description' => ['nullable', 'string'],
             'banner_url' => ['nullable', 'string', 'max:2048'],
             'gallery' => ['nullable', 'array'],

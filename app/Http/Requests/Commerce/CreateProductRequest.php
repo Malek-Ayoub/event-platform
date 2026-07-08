@@ -31,7 +31,7 @@ class CreateProductRequest extends BaseApiRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
-            'event_id' => ['nullable', 'integer', 'exists:events,id'],
+            'event_id' => ['nullable', 'integer', $this->tenantExists('events')],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

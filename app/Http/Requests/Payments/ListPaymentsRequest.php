@@ -20,7 +20,7 @@ class ListPaymentsRequest extends PaginatedListRequest
     public function rules(): array
     {
         return array_merge(parent::rules(), [
-            'order_id' => ['sometimes', 'integer', 'exists:orders,id'],
+            'order_id' => ['sometimes', 'integer', $this->tenantExists('orders')],
             'status' => ['sometimes', 'string', Rule::enum(PaymentTransactionStatus::class)],
         ]);
     }

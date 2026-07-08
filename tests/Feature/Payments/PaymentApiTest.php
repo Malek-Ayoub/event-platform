@@ -151,7 +151,25 @@ class PaymentApiTest extends TestCase
             'provider' => 'shamcash',
             'provider_transaction_id' => 'TXN-BAD-AMT',
             'amount' => '99.00',
-        ])->assertStatus(500);
+        ])->assertStatus(422);
+    }
+
+    #[Test]
+    public function initiating_payment_for_another_venues_order_fails_validation(): void
+    {
+        ['token' => $token] = $this->authenticateVenueOwner();
+
+        ['venue' => $otherVenue] = $this->createVenueOwner();
+        ['order' => $foreignOrder] = $this->createPendingOrder($otherVenue);
+
+        $this->withToken($token)->postJson('/api/tenant/payments', [
+            'order_id' => $foreignOrder->id,
+            'provider' => 'shamcash',
+            'provider_transaction_id' => 'TXN-CROSS-TENANT',
+            'amount' => $foreignOrder->total,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['order_id']);
     }
 
     #[Test]

@@ -28,14 +28,14 @@ class CreateOrderRequest extends BaseApiRequest
     public function rules(): array
     {
         return [
-            'event_id' => ['required', 'integer', 'exists:events,id'],
+            'event_id' => ['required', 'integer', $this->tenantExists('events')],
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_email' => ['required', 'string', 'email', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
             'customer_user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'reservation_id' => ['nullable', 'integer', 'exists:reservations,id'],
+            'reservation_id' => ['nullable', 'integer', $this->tenantExists('reservations')],
             'line_items' => ['required', 'array', 'min:1'],
-            'line_items.*.ticket_type_id' => ['required', 'integer', 'exists:ticket_types,id'],
+            'line_items.*.ticket_type_id' => ['required', 'integer', $this->tenantExists('ticket_types')],
             'line_items.*.quantity' => ['required', 'integer', 'min:1'],
         ];
     }

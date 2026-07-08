@@ -28,7 +28,7 @@ class InitiatePaymentRequest extends BaseApiRequest
     public function rules(): array
     {
         return [
-            'order_id' => ['required', 'integer', 'exists:orders,id'],
+            'order_id' => ['required', 'integer', $this->tenantExists('orders')],
             'provider' => ['required', 'string', 'max:50'],
             'provider_transaction_id' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],

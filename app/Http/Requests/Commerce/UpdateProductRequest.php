@@ -34,7 +34,7 @@ class UpdateProductRequest extends BaseApiRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'price' => ['sometimes', 'numeric', 'min:0'],
-            'event_id' => ['sometimes', 'nullable', 'integer', 'exists:events,id'],
+            'event_id' => ['sometimes', 'nullable', 'integer', $this->tenantExists('events')],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

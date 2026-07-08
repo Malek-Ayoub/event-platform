@@ -2,8 +2,11 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Domain\Tenancy\Contracts\TenantContextInterface;
 use App\DTOs\BaseDTO;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 use LogicException;
 
 abstract class BaseApiRequest extends FormRequest
@@ -14,6 +17,18 @@ abstract class BaseApiRequest extends FormRequest
     protected function dtoClass(): ?string
     {
         return null;
+    }
+
+    /**
+     * Builds an `exists` validation rule scoped to the current tenant's venue,
+     * so cross-venue IDs fail validation (422) instead of leaking through to a
+     * 404 at the model-scope layer.
+     */
+    protected function tenantExists(string $table, string $column = 'id'): Exists
+    {
+        $venueId = app(TenantContextInterface::class)->requireVenueId();
+
+        return Rule::exists($table, $column)->where('venue_id', $venueId);
     }
 
     public function toDto(): BaseDTO

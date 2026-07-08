@@ -24,7 +24,10 @@ class PaymentTransactionResource extends ApiResource
             'amount' => $this->amount,
             'currency' => $this->currency,
             'status' => $this->status->value,
-            'payload' => $this->payload,
+            'payload' => $this->when(
+                $request->user()?->can('update', $this->resource) ?? false,
+                $this->payload,
+            ),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

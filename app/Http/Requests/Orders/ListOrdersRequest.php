@@ -20,7 +20,7 @@ class ListOrdersRequest extends PaginatedListRequest
     public function rules(): array
     {
         return array_merge(parent::rules(), [
-            'event_id' => ['sometimes', 'integer', 'exists:events,id'],
+            'event_id' => ['sometimes', 'integer', $this->tenantExists('events')],
             'status' => ['sometimes', 'string', Rule::enum(OrderStatus::class)],
         ]);
     }

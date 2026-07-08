@@ -201,4 +201,25 @@ class OrderApiTest extends TestCase
             ->assertJsonPath('data.id', $order->id)
             ->assertJsonPath('data.order_number', $order->order_number);
     }
+
+    #[Test]
+    public function creating_order_with_another_venues_event_fails_validation(): void
+    {
+        ['token' => $token] = $this->authenticateVenueOwner();
+
+        ['venue' => $otherVenue] = $this->createVenueOwner();
+        $foreignEvent = Event::factory()->create(['venue_id' => $otherVenue->id]);
+        $foreignTicketType = TicketType::factory()->forEvent($foreignEvent)->create(['quantity' => 5]);
+
+        $this->withToken($token)->postJson('/api/tenant/orders', [
+            'event_id' => $foreignEvent->id,
+            'customer_name' => 'Cross Tenant',
+            'customer_email' => 'cross-tenant@example.com',
+            'line_items' => [
+                ['ticket_type_id' => $foreignTicketType->id, 'quantity' => 1],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['event_id', 'line_items.0.ticket_type_id']);
+    }
 }

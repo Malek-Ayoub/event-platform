@@ -34,7 +34,7 @@ class UpdateEventRequest extends BaseApiRequest
             'version' => ['required', 'integer', 'min:1'],
             'name' => ['sometimes', 'string', 'max:255'],
             'slug' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'category_id' => ['sometimes', 'nullable', 'integer', 'exists:categories,id'],
+            'category_id' => ['sometimes', 'nullable', 'integer', $this->tenantExists('categories')],
             'description' => ['sometimes', 'nullable', 'string'],
             'banner_url' => ['sometimes', 'nullable', 'string', 'max:2048'],
             'gallery' => ['sometimes', 'nullable', 'array'],

@@ -39,7 +39,7 @@ class CreateProductVariantRequest extends BaseApiRequest
     public function rules(): array
     {
         return [
-            'product_id' => ['required', 'integer', 'exists:products,id'],
+            'product_id' => ['required', 'integer', $this->tenantExists('products')],
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:255'],
             'price_override' => ['nullable', 'numeric', 'min:0'],

@@ -119,6 +119,23 @@ class CommerceApiTest extends TestCase
     }
 
     #[Test]
+    public function creating_product_linked_to_another_venues_event_fails_validation(): void
+    {
+        ['token' => $token] = $this->authenticateVenueOwner();
+
+        ['venue' => $otherVenue] = $this->createVenueOwner();
+        $foreignEvent = Event::factory()->create(['venue_id' => $otherVenue->id]);
+
+        $this->withToken($token)->postJson('/api/tenant/products', [
+            'name' => 'Cross Tenant Add-on',
+            'price' => '99.00',
+            'event_id' => $foreignEvent->id,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['event_id']);
+    }
+
+    #[Test]
     public function owner_can_manage_coupons_and_promo_codes(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();

@@ -5,6 +5,7 @@ namespace App\Services\Payments;
 use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Exceptions\Payments\OrderNotPayableException;
+use App\Exceptions\Payments\PaymentAmountMismatchException;
 use App\Exceptions\Payments\PaymentProviderMismatchException;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
@@ -75,8 +76,10 @@ class PaymentService
             }
 
             if (bccomp($this->formatAmount($data->amount), $this->formatAmount($order->total), 2) !== 0) {
-                throw new \InvalidArgumentException(
-                    "Payment amount {$data->amount} must match order total {$order->total}.",
+                throw PaymentAmountMismatchException::forOrder(
+                    (int) $order->id,
+                    $this->formatAmount($data->amount),
+                    $this->formatAmount($order->total),
                 );
             }
 

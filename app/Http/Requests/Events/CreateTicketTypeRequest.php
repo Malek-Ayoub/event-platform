@@ -39,7 +39,7 @@ class CreateTicketTypeRequest extends BaseApiRequest
     public function rules(): array
     {
         return [
-            'event_id' => ['required', 'integer', 'exists:events,id'],
+            'event_id' => ['required', 'integer', $this->tenantExists('events')],
             'name' => ['required', 'string', 'max:255'],
             'price' => ['required', 'numeric', 'min:0'],
             'quantity' => ['required', 'integer', 'min:1'],
