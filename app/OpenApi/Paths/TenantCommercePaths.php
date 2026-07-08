@@ -1,0 +1,77 @@
+<?php
+
+namespace App\OpenApi\Paths;
+
+use OpenApi\Attributes as OA;
+
+/** OpenAPI path projections for tenant commerce routes (products, variants, coupons, promo codes). */
+final class TenantCommercePaths
+{
+    // --- Products ---
+
+    #[OA\Get(path: '/api/tenant/products', operationId: 'tenant.products.index', summary: 'List products', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100))], responses: [new OA\Response(response: 200, description: 'Paginated products', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/ProductResource')), new OA\Property(property: 'meta', ref: '#/components/schemas/PaginationMeta'), new OA\Property(property: 'links', ref: '#/components/schemas/PaginationLinks')], type: 'object'))])]
+    public function productsIndex(): void {}
+
+    #[OA\Post(path: '/api/tenant/products', operationId: 'tenant.products.store', summary: 'Create product', tags: ['Commerce'], security: [['sanctum' => []]], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['name', 'price'], properties: [new OA\Property(property: 'name', type: 'string'), new OA\Property(property: 'description', type: 'string', nullable: true), new OA\Property(property: 'price', type: 'number'), new OA\Property(property: 'event_id', type: 'integer', nullable: true), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 201, description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/ProductResource')], type: 'object'))])]
+    public function productsStore(): void {}
+
+    #[OA\Get(path: '/api/tenant/products/{product}', operationId: 'tenant.products.show', summary: 'Show product', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'product', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/ProductResource')], type: 'object'))])]
+    public function productsShow(): void {}
+
+    #[OA\Put(path: '/api/tenant/products/{product}', operationId: 'tenant.products.update', summary: 'Update product', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'product', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [new OA\Property(property: 'name', type: 'string'), new OA\Property(property: 'description', type: 'string', nullable: true), new OA\Property(property: 'price', type: 'number'), new OA\Property(property: 'event_id', type: 'integer', nullable: true), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 200, description: 'Updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/ProductResource')], type: 'object'))])]
+    public function productsUpdate(): void {}
+
+    #[OA\Delete(path: '/api/tenant/products/{product}', operationId: 'tenant.products.destroy', summary: 'Delete product', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'product', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'Deleted', content: new OA\JsonContent(ref: '#/components/schemas/MessageResponse'))])]
+    public function productsDestroy(): void {}
+
+    // --- Product Variants ---
+
+    #[OA\Get(path: '/api/tenant/products/{product}/variants', operationId: 'tenant.products.variants.index', summary: 'List product variants', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'product', in: 'path', required: true, schema: new OA\Schema(type: 'integer')), new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100))], responses: [new OA\Response(response: 200, description: 'Paginated variants', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/ProductVariantResource')), new OA\Property(property: 'meta', ref: '#/components/schemas/PaginationMeta'), new OA\Property(property: 'links', ref: '#/components/schemas/PaginationLinks')], type: 'object'))])]
+    public function variantsIndex(): void {}
+
+    #[OA\Post(path: '/api/tenant/products/{product}/variants', operationId: 'tenant.products.variants.store', summary: 'Create product variant', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'product', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['name'], properties: [new OA\Property(property: 'name', type: 'string'), new OA\Property(property: 'sku', type: 'string', nullable: true), new OA\Property(property: 'price_override', type: 'number', nullable: true), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 201, description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/ProductVariantResource')], type: 'object'))])]
+    public function variantsStore(): void {}
+
+    #[OA\Get(path: '/api/tenant/product-variants/{productVariant}', operationId: 'tenant.product-variants.show', summary: 'Show product variant', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'productVariant', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/ProductVariantResource')], type: 'object'))])]
+    public function variantsShow(): void {}
+
+    #[OA\Put(path: '/api/tenant/product-variants/{productVariant}', operationId: 'tenant.product-variants.update', summary: 'Update product variant', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'productVariant', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [new OA\Property(property: 'name', type: 'string'), new OA\Property(property: 'sku', type: 'string', nullable: true), new OA\Property(property: 'price_override', type: 'number', nullable: true), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 200, description: 'Updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/ProductVariantResource')], type: 'object'))])]
+    public function variantsUpdate(): void {}
+
+    #[OA\Delete(path: '/api/tenant/product-variants/{productVariant}', operationId: 'tenant.product-variants.destroy', summary: 'Delete product variant', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'productVariant', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'Deleted', content: new OA\JsonContent(ref: '#/components/schemas/MessageResponse'))])]
+    public function variantsDestroy(): void {}
+
+    // --- Coupons ---
+
+    #[OA\Get(path: '/api/tenant/coupons', operationId: 'tenant.coupons.index', summary: 'List coupons', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100))], responses: [new OA\Response(response: 200, description: 'Paginated coupons', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/CouponResource')), new OA\Property(property: 'meta', ref: '#/components/schemas/PaginationMeta'), new OA\Property(property: 'links', ref: '#/components/schemas/PaginationLinks')], type: 'object'))])]
+    public function couponsIndex(): void {}
+
+    #[OA\Post(path: '/api/tenant/coupons', operationId: 'tenant.coupons.store', summary: 'Create coupon', tags: ['Commerce'], security: [['sanctum' => []]], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['code', 'discount_type', 'discount_value'], properties: [new OA\Property(property: 'code', type: 'string'), new OA\Property(property: 'discount_type', type: 'string', enum: ['percent', 'fixed']), new OA\Property(property: 'discount_value', type: 'number'), new OA\Property(property: 'min_order_amount', type: 'number', nullable: true), new OA\Property(property: 'max_uses', type: 'integer', nullable: true), new OA\Property(property: 'starts_at', type: 'string', format: 'date-time', nullable: true), new OA\Property(property: 'expires_at', type: 'string', format: 'date-time', nullable: true), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 201, description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/CouponResource')], type: 'object'))])]
+    public function couponsStore(): void {}
+
+    #[OA\Get(path: '/api/tenant/coupons/{coupon}', operationId: 'tenant.coupons.show', summary: 'Show coupon', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'coupon', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/CouponResource')], type: 'object'))])]
+    public function couponsShow(): void {}
+
+    #[OA\Put(path: '/api/tenant/coupons/{coupon}', operationId: 'tenant.coupons.update', summary: 'Update coupon', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'coupon', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [new OA\Property(property: 'code', type: 'string'), new OA\Property(property: 'discount_type', type: 'string', enum: ['percent', 'fixed']), new OA\Property(property: 'discount_value', type: 'number'), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 200, description: 'Updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/CouponResource')], type: 'object'))])]
+    public function couponsUpdate(): void {}
+
+    #[OA\Delete(path: '/api/tenant/coupons/{coupon}', operationId: 'tenant.coupons.destroy', summary: 'Delete coupon', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'coupon', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'Deleted', content: new OA\JsonContent(ref: '#/components/schemas/MessageResponse'))])]
+    public function couponsDestroy(): void {}
+
+    // --- Promo Codes ---
+
+    #[OA\Get(path: '/api/tenant/promo-codes', operationId: 'tenant.promo-codes.index', summary: 'List promo codes', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100))], responses: [new OA\Response(response: 200, description: 'Paginated promo codes', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/PromoCodeResource')), new OA\Property(property: 'meta', ref: '#/components/schemas/PaginationMeta'), new OA\Property(property: 'links', ref: '#/components/schemas/PaginationLinks')], type: 'object'))])]
+    public function promoCodesIndex(): void {}
+
+    #[OA\Post(path: '/api/tenant/promo-codes', operationId: 'tenant.promo-codes.store', summary: 'Create promo code', tags: ['Commerce'], security: [['sanctum' => []]], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['code', 'discount_type', 'discount_value'], properties: [new OA\Property(property: 'code', type: 'string'), new OA\Property(property: 'discount_type', type: 'string', enum: ['percent', 'fixed']), new OA\Property(property: 'discount_value', type: 'number'), new OA\Property(property: 'min_order_amount', type: 'number', nullable: true), new OA\Property(property: 'max_uses', type: 'integer', nullable: true), new OA\Property(property: 'starts_at', type: 'string', format: 'date-time', nullable: true), new OA\Property(property: 'expires_at', type: 'string', format: 'date-time', nullable: true), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 201, description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/PromoCodeResource')], type: 'object'))])]
+    public function promoCodesStore(): void {}
+
+    #[OA\Get(path: '/api/tenant/promo-codes/{promoCode}', operationId: 'tenant.promo-codes.show', summary: 'Show promo code', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'promoCode', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/PromoCodeResource')], type: 'object'))])]
+    public function promoCodesShow(): void {}
+
+    #[OA\Put(path: '/api/tenant/promo-codes/{promoCode}', operationId: 'tenant.promo-codes.update', summary: 'Update promo code', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'promoCode', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [new OA\Property(property: 'code', type: 'string'), new OA\Property(property: 'discount_type', type: 'string', enum: ['percent', 'fixed']), new OA\Property(property: 'discount_value', type: 'number'), new OA\Property(property: 'is_active', type: 'boolean')], type: 'object')), responses: [new OA\Response(response: 200, description: 'Updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: '#/components/schemas/PromoCodeResource')], type: 'object'))])]
+    public function promoCodesUpdate(): void {}
+
+    #[OA\Delete(path: '/api/tenant/promo-codes/{promoCode}', operationId: 'tenant.promo-codes.destroy', summary: 'Delete promo code', tags: ['Commerce'], security: [['sanctum' => []]], parameters: [new OA\Parameter(name: 'promoCode', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'Deleted', content: new OA\JsonContent(ref: '#/components/schemas/MessageResponse'))])]
+    public function promoCodesDestroy(): void {}
+}

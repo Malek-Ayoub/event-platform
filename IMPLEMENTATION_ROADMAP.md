@@ -708,7 +708,7 @@ No methods except constructors / static factories (fromArray, …)
 | **6.5** | Order APIs | ✅ |
 | **6.6** | Payment APIs | ✅ |
 | **6.7** | Platform APIs | ✅ |
-| **6.8** | OpenAPI/Swagger + **`ControllerArchitectureGuardTest`** | — |
+| **6.8** | OpenAPI/Swagger + **`ControllerArchitectureGuardTest`** + **`OpenApiContractGuardTest`** | ✅ |
 
 كل batch ينتهي باختبارات خضراء قبل التالي.
 
@@ -739,6 +739,48 @@ No methods except constructors / static factories (fromArray, …)
 ##### §6.10 — Payment SSOT (Guard extension — Phase 6.8)
 
 `ControllerArchitectureGuardTest` + `ServiceArchitectureGuardTest` يمنعان `Order.status = paid` خارج `PaymentService`.
+
+---
+
+##### §6.12 — OpenAPI Contract Projection (Phase 6.8)
+
+**مصدر الحقيقة (SSOT) للعقد:**
+
+```
+FormRequest + ApiResource + DTO
+```
+
+**OpenAPI (`app/OpenApi/`) = Projection فقط** — ليس SSOT. أي تغيير في Validation أو Resource **يجب** أن يُحدَّث معه الـ projection في **نفس الـ commit**.
+
+**Exit Criteria (6.8):**
+
+| # | Criterion |
+|---|---|
+| 1 | `php artisan l5-swagger:generate` يعمل بدون أخطاء |
+| 2 | كل named routes في `routes/api.php` + `routes/tenant.php` موثّقة (`operationId` = route name) |
+| 3 | لا schemas يتيمة (orphan) — كل schema مُشار إليها من paths |
+| 4 | أمثلة request/response للعمليات الأساسية: Auth, Events, Orders, Payments |
+| 5 | `OpenApiContractGuardTest` + `ControllerArchitectureGuardTest` خضراء |
+
+**OpenAPI Contract Sync Checklist (مراجعة PR):**
+
+- [ ] هل تغيّر `FormRequest::rules()`؟ → حدّث `app/OpenApi/Schemas/Requests/*` المقابل
+- [ ] هل تغيّر `ApiResource::toArray()`؟ → حدّث `app/OpenApi/Schemas/Resources/*` المقابل
+- [ ] هل أُضيف route جديد؟ → أضف path projection في `app/OpenApi/Paths/*`
+- [ ] شغّل `php artisan l5-swagger:generate` و `php artisan test --filter=OpenApiContractGuardTest`
+
+**ملفات:**
+
+| Layer | Path |
+|---|---|
+| Root metadata | `app/OpenApi/OpenApiSpec.php` |
+| Contract registry | `app/OpenApi/OpenApiContractRegistry.php` |
+| Request projections | `app/OpenApi/Schemas/Requests/` (mirror `FormRequest`) |
+| Resource projections | `app/OpenApi/Schemas/Resources/` (mirror `ApiResource`) |
+| Path projections | `app/OpenApi/Paths/` (mirror `routes/api.php` + `routes/tenant.php`) |
+| Guard test | `tests/Feature/Architecture/OpenApiContractGuardTest.php` |
+
+**Package:** `darkaonline/l5-swagger ^11.1` — UI at `/api/documentation`.
 
 ---
 
@@ -2051,6 +2093,11 @@ Domain & Authorization (§1.1)
   ☑ Phase 6.1 — API Infrastructure
   ☑ Phase 6.2 — Authentication APIs
   ☑ Phase 6.3 — Event APIs (§6.11)
+  ☑ Phase 6.4 — Commerce APIs
+  ☑ Phase 6.5 — Order APIs
+  ☑ Phase 6.6 — Payment APIs
+  ☑ Phase 6.7 — Platform APIs
+  ☑ Phase 6.8 — OpenAPI/Swagger + Architecture Guards
 ☐ Phase 7  — Payments (Gateway, Webhooks, Refunds, Commissions)
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
 ☐ Phase 9  — Production Hardening
