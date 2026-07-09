@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Models\Venue;
 use App\Services\Payments\Gateway\Http\Adapters\LaravelHttpClientAdapter;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
-use App\Services\Payments\Gateway\ShamCash\ShamCashGateway;
 use App\Services\Payments\PaymentGatewayService;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
@@ -18,16 +17,15 @@ use Illuminate\Testing\TestResponse;
 
 trait InteractsWithPaymentFlows
 {
-    protected function configureShamcashGateway(): void
+    protected function configureApiSyriaGateway(): void
     {
         $this->resetHttpFakes();
 
         config([
-            'payment_gateways.providers.shamcash.base_url' => 'https://api.shamcash.test',
-            'payment_gateways.providers.shamcash.api_key' => 'test-key',
-            'payment_gateways.providers.shamcash.initiate_path' => '/v1/payments',
-            'payment_gateways.providers.shamcash.refund_path' => '/v1/refunds',
-            'payment_gateways.providers.shamcash.webhook_secret' => 'whsec_test',
+            'payment_gateways.providers.apisyria.base_url' => 'https://api.syria.test',
+            'payment_gateways.providers.apisyria.api_key' => 'test-key',
+            'payment_gateways.providers.apisyria.merchant_account' => 'WALLET-001',
+            'payment_gateways.providers.apisyria.verify_transaction_path' => '/find_tx',
         ]);
     }
 
@@ -37,41 +35,38 @@ trait InteractsWithPaymentFlows
 
         $this->app->forgetInstance(HttpClientInterface::class);
         $this->app->forgetInstance(LaravelHttpClientAdapter::class);
-        $this->app->forgetInstance(ShamCashGateway::class);
         $this->app->forgetInstance(PaymentGatewayRegistry::class);
         $this->app->forgetInstance(PaymentGatewayService::class);
     }
 
-    protected function fakeSuccessfulShamcashInitiate(
-        string $transactionId,
-        ?string $redirectUrl = null,
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    protected function fakeApiSyriaFindTx(
+        string $transactionNumber,
+        array $overrides = [],
+        int $status = 200,
     ): void {
         Http::fake([
-            'https://api.shamcash.test/v1/payments' => Http::response([
-                'transaction_id' => $transactionId,
-                'status' => 'pending',
-                'redirect_url' => $redirectUrl ?? 'https://pay.shamcash.test/checkout/'.$transactionId,
-            ], 201),
+            'https://api.syria.test/find_tx' => Http::response(array_merge([
+                'found' => true,
+                'transaction_id' => 'APISYRIA-'.$transactionNumber,
+                'amount' => '120.00',
+                'currency' => 'USD',
+                'receiver_account' => 'WALLET-001',
+                'status' => 'completed',
+            ], $overrides), $status),
         ]);
     }
 
-    protected function fakeDeclinedShamcashInitiate(string $message = 'Provider declined payment'): void
+    protected function fakeApiSyriaFindTxNotFound(string $transactionNumber): void
     {
-        Http::fake([
-            'https://api.shamcash.test/v1/payments' => Http::response([
-                'transaction_id' => 'SC-TXN-DECLINED',
-                'message' => $message,
-            ], 422),
-        ]);
-    }
-
-    protected function fakeSuccessfulShamcashRefund(string $refundId, string $status = 'pending'): void
-    {
-        Http::fake([
-            'https://api.shamcash.test/v1/refunds' => Http::response([
-                'refund_id' => $refundId,
-                'status' => $status,
-            ], 200),
+        $this->fakeApiSyriaFindTx($transactionNumber, [
+            'found' => false,
+            'transaction_id' => null,
+            'amount' => null,
+            'currency' => null,
+            'receiver_account' => null,
         ]);
     }
 
@@ -107,15 +102,28 @@ trait InteractsWithPaymentFlows
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @return array{payment_id: int, response: TestResponse}
      */
-    protected function postSignedShamcashWebhook(array $payload): TestResponse
+    protected function createPaymentInstructions(string $token, Order $order, string $provider = 'apisyria'): array
     {
-        $rawBody = json_encode($payload, JSON_THROW_ON_ERROR);
-        $signature = hash_hmac('sha256', $rawBody, 'whsec_test');
+        $response = $this->withToken($token)->postJson('/api/tenant/payments', [
+            'order_id' => $order->id,
+            'provider' => $provider,
+        ])->assertCreated();
 
-        return $this->postJson('/webhooks/shamcash', $payload, [
-            'X-ShamCash-Signature' => $signature,
+        return [
+            'payment_id' => (int) $response->json('data.payment_id'),
+            'response' => $response,
+        ];
+    }
+
+    protected function verifyPayment(
+        string $token,
+        int $paymentId,
+        string $transactionNumber,
+    ): TestResponse {
+        return $this->withToken($token)->postJson("/api/tenant/payments/{$paymentId}/verify", [
+            'transaction_number' => $transactionNumber,
         ]);
     }
 }

@@ -242,22 +242,12 @@ final class PaymentGatewayService
 
         $this->assertSuccessfulVerifyLookup($provider, $gatewayResponse);
 
-        if ($gatewayResponse->providerTransactionId !== null && $gatewayResponse->providerTransactionId !== '') {
-            $this->correlationContext->bind(
-                PaymentCorrelation::forProviderTransaction($provider, $gatewayResponse->providerTransactionId),
-            );
-        }
-
-        try {
-            return $this->verifyTransactionResponseMapper->toDomainResult(
-                response: $gatewayResponse,
-                expectedAmount: $data->expectedAmount,
-                expectedCurrency: $data->expectedCurrency,
-                expectedReceiverAccount: $data->merchantAccount,
-            );
-        } finally {
-            $this->correlationContext->clear();
-        }
+        return $this->verifyTransactionResponseMapper->toDomainResult(
+            response: $gatewayResponse,
+            expectedAmount: $data->expectedAmount,
+            expectedCurrency: $data->expectedCurrency,
+            expectedReceiverAccount: $data->merchantAccount,
+        );
     }
 
     public function handleWebhook(IncomingWebhookData $data): WebhookHandleResult

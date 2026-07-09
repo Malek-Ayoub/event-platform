@@ -203,7 +203,7 @@ class CommissionService
                 );
             }
 
-            if ($payment->status !== PaymentTransactionStatus::Completed) {
+            if (! $this->isSuccessfulPayment($payment->status)) {
                 throw PaymentNotCompletedException::forPaymentTransaction((int) $payment->id);
             }
 
@@ -212,12 +212,23 @@ class CommissionService
 
         $hasCompleted = PaymentTransaction::query()
             ->where('order_id', $order->id)
-            ->where('status', PaymentTransactionStatus::Completed)
+            ->whereIn('status', [
+                PaymentTransactionStatus::Completed,
+                PaymentTransactionStatus::Paid,
+            ])
             ->exists();
 
         if (! $hasCompleted) {
             throw PaymentNotCompletedException::forOrder((int) $order->id);
         }
+    }
+
+    private function isSuccessfulPayment(PaymentTransactionStatus $status): bool
+    {
+        return in_array($status, [
+            PaymentTransactionStatus::Completed,
+            PaymentTransactionStatus::Paid,
+        ], true);
     }
 
     private function calculateCommissionAmount(string $baseAmount, string $rate): string

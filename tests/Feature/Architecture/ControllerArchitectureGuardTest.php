@@ -69,7 +69,7 @@ class ControllerArchitectureGuardTest extends TestCase
         OrderController::class => ['PaymentService', 'TicketService', 'EventService'],
         PaymentController::class => [
             'OrderService', 'RefundService', 'CommissionService', 'TicketService', 'EventService', 'OrderStatus::Paid',
-            'PaymentGatewayService',
+            'PaymentGatewayService', 'PaymentGatewayRegistry', 'PaymentVerificationGateway',
         ],
         TaxRateController::class => ['OrderService', 'PaymentService'],
         PlatformSettingController::class => ['OrderService', 'PaymentService'],
@@ -240,8 +240,17 @@ class ControllerArchitectureGuardTest extends TestCase
         }
     }
 
+    #[Test]
+    public function payment_controller_depends_only_on_instruction_and_verification_services(): void
+    {
+        $source = $this->sourceOf(PaymentController::class);
+
+        $this->assertStringContainsString('PaymentInstructionService', $source);
+        $this->assertStringContainsString('PaymentVerificationService', $source);
+        $this->assertStringContainsString('PaymentService', $source);
+    }
+
     /**
-     * Payment SSOT (§6.10): only PaymentController may reference
      * OrderStatus::Paid, and it must not do so directly (that responsibility
      * belongs solely to PaymentService — enforced separately in
      * ServiceArchitectureGuardTest::only_payment_service_marks_orders_as_paid()).

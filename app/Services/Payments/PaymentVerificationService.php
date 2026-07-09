@@ -2,10 +2,12 @@
 
 namespace App\Services\Payments;
 
+use App\Domain\Correlation\Contracts\CorrelationContextInterface;
 use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\Payments\VerificationFailureReason;
 use App\Exceptions\Payments\DuplicateTransactionNumberException;
 use App\Models\PaymentTransaction;
+use App\Support\Payments\PaymentCorrelation;
 use App\Services\Payments\Data\BeginVerificationData;
 use App\Services\Payments\Data\ExpirePaymentData;
 use App\Services\Payments\Data\GatewayVerifyTransactionData;
@@ -23,6 +25,7 @@ final class PaymentVerificationService
     public function __construct(
         private PaymentService $paymentService,
         private PaymentGatewayService $paymentGatewayService,
+        private CorrelationContextInterface $correlationContext,
     ) {}
 
     public function verify(VerifyTransactionData $data): PaymentTransaction
@@ -54,38 +57,46 @@ final class PaymentVerificationService
             throw DuplicateTransactionNumberException::forTransactionNumber($transactionNumber);
         }
 
-        $payment = $this->paymentService->beginVerification(new BeginVerificationData(
-            paymentTransactionId: (int) $payment->id,
-            transactionNumber: $transactionNumber,
-            actor: $data->actor,
-            ipAddress: $data->ipAddress,
-        ));
+        $this->correlationContext->bind(
+            PaymentCorrelation::forProviderTransaction((string) $payment->provider, $transactionNumber),
+        );
 
-        $config = GatewayProviderConfig::forProvider((string) $payment->provider);
-
-        $result = $this->paymentGatewayService->verifyTransaction(new GatewayVerifyTransactionData(
-            provider: (string) $payment->provider,
-            transactionNumber: $transactionNumber,
-            expectedAmount: number_format((float) $payment->amount, 2, '.', ''),
-            expectedCurrency: (string) $payment->currency,
-            merchantAccount: $config->merchantAccount,
-        ));
-
-        if ($result->matched && $result->providerTransactionId !== null) {
-            return $this->paymentService->markPaid(new MarkPaidData(
+        try {
+            $payment = $this->paymentService->beginVerification(new BeginVerificationData(
                 paymentTransactionId: (int) $payment->id,
-                providerTransactionId: $result->providerTransactionId,
+                transactionNumber: $transactionNumber,
                 actor: $data->actor,
                 ipAddress: $data->ipAddress,
             ));
-        }
 
-        return $this->paymentService->markVerificationFailed(new MarkVerificationFailedData(
-            paymentTransactionId: (int) $payment->id,
-            reason: $result->reason ?? VerificationFailureReason::NotFound,
-            actor: $data->actor,
-            ipAddress: $data->ipAddress,
-        ));
+            $config = GatewayProviderConfig::forProvider((string) $payment->provider);
+
+            $result = $this->paymentGatewayService->verifyTransaction(new GatewayVerifyTransactionData(
+                provider: (string) $payment->provider,
+                transactionNumber: $transactionNumber,
+                expectedAmount: number_format((float) $payment->amount, 2, '.', ''),
+                expectedCurrency: (string) $payment->currency,
+                merchantAccount: $config->merchantAccount,
+            ));
+
+            if ($result->matched && $result->providerTransactionId !== null) {
+                return $this->paymentService->markPaid(new MarkPaidData(
+                    paymentTransactionId: (int) $payment->id,
+                    providerTransactionId: $result->providerTransactionId,
+                    actor: $data->actor,
+                    ipAddress: $data->ipAddress,
+                ));
+            }
+
+            return $this->paymentService->markVerificationFailed(new MarkVerificationFailedData(
+                paymentTransactionId: (int) $payment->id,
+                reason: $result->reason ?? VerificationFailureReason::NotFound,
+                actor: $data->actor,
+                ipAddress: $data->ipAddress,
+            ));
+        } finally {
+            $this->correlationContext->clear();
+        }
     }
 
     private function canVerify(PaymentTransactionStatus $status): bool

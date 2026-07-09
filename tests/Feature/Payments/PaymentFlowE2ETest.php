@@ -5,7 +5,6 @@ namespace Tests\Feature\Payments;
 use App\Enums\FinancialDomain\CommissionStatus;
 use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\FinancialDomain\RefundStatus;
-use App\Enums\InfrastructureDomain\WebhookLogStatus;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Models\ActivityLog;
 use App\Models\Commission;
@@ -18,28 +17,21 @@ use App\Models\Scopes\BelongsToVenueScope;
 use App\Services\Commissions\CommissionService;
 use App\Services\Commissions\Data\RecordCommissionAdjustmentData;
 use App\Services\Commissions\Data\RecordCommissionData;
-use App\Services\Payments\Data\GatewayInitiatePaymentData;
-use App\Services\Payments\Data\GatewayRefundData;
-use App\Services\Payments\Gateway\PaymentGatewayRegistry;
-use App\Services\Payments\PaymentGatewayService;
 use App\Services\Refunds\Data\CreateRefundData;
 use App\Services\Refunds\Data\ProcessRefundData;
 use App\Services\Refunds\RefundService;
 use App\Support\Payments\PaymentCorrelation;
-use App\Support\Webhooks\WebhookCorrelation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Support\Concerns\InteractsWithPaymentFlows;
 use Tests\TestCase;
-use Tests\Unit\Services\Payments\CountingShamCashGatewayStub;
-use Tests\Unit\Services\Payments\DecliningPaymentGatewayStub;
 
 /**
- * Phase 7.5 — end-to-end payment integration flows over HTTP + domain orchestration.
+ * Batch 7.8 — Manual Wallet Transfer E2E (IMPLEMENTATION_ROADMAP.md §7.9.11).
  *
- * @deprecated Legacy hosted-checkout E2E — superseded by Manual Transfer flow (§7.9).
- *             Rewrite scheduled for Batch 7.8; skipped until then so Batch 7.7 API wiring can ship.
+ * Covers the full HTTP path: instructions → verify → paid, failure cases,
+ * idempotency, commission/refund orchestration, and correlation IDs.
  */
 class PaymentFlowE2ETest extends TestCase
 {
@@ -50,306 +42,194 @@ class PaymentFlowE2ETest extends TestCase
     {
         parent::setUp();
 
-        $this->markTestSkipped('Legacy hosted-checkout E2E superseded by Manual Transfer flow — rewrite in Batch 7.8 (§7.9).');
-
         config()->set('tenancy.base_domain', 'localhost');
-        $this->configureShamcashGateway();
+        $this->configureApiSyriaGateway();
     }
 
     #[Test]
-    public function initiate_redirect_webhook_marks_order_paid_with_shared_correlation(): void
+    public function manual_transfer_happy_path_marks_order_paid_with_shared_correlation(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
         ['order' => $order] = $this->createPendingOrderForPayments($venue);
 
-        $transactionId = 'SC-E2E-FLOW-001';
-        $this->fakeSuccessfulShamcashInitiate($transactionId);
-
-        $initiate = $this->withToken($token)->postJson('/api/tenant/payments', [
-            'order_id' => $order->id,
-            'provider' => 'shamcash',
+        $transactionNumber = 'TX-E2E-HAPPY-001';
+        $this->fakeApiSyriaFindTx($transactionNumber, [
             'amount' => '120.00',
+            'transaction_id' => 'APISYRIA-'.$transactionNumber,
         ]);
 
-        $initiate
-            ->assertCreated()
-            ->assertJsonPath('data.provider_transaction_id', $transactionId)
-            ->assertJsonPath('meta.redirect_url', 'https://pay.shamcash.test/checkout/'.$transactionId);
+        ['payment_id' => $paymentId] = $this->createPaymentInstructions($token, $order);
 
-        $initiateCorrelation = PaymentCorrelation::forProviderTransaction('shamcash', $transactionId);
+        $this->verifyPayment($token, $paymentId, $transactionNumber)
+            ->assertOk()
+            ->assertJsonPath('data.status', PaymentTransactionStatus::Paid->value)
+            ->assertJsonPath('data.transaction_number', $transactionNumber);
 
-        $this->assertDatabaseHas('activity_logs', [
-            'correlation_id' => $initiateCorrelation,
-            'action' => 'initiated',
-        ]);
+        $correlationId = PaymentCorrelation::forProviderTransaction('apisyria', $transactionNumber);
 
-        $this->postSignedShamcashWebhook([
-            'event_id' => $transactionId,
-            'event_type' => 'payment.completed',
-            'provider_transaction_id' => $transactionId,
-        ])
-            ->assertAccepted()
-            ->assertJsonPath('data.status', WebhookLogStatus::Processed->value);
-
-        $webhookCorrelation = WebhookCorrelation::id('shamcash', $transactionId);
-
-        $this->assertSame($initiateCorrelation, $webhookCorrelation);
+        $payment = PaymentTransaction::withoutGlobalScopes()->findOrFail($paymentId);
+        $this->assertSame($transactionNumber, $payment->transaction_number);
         $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
-        $payment = PaymentTransaction::withoutGlobalScopes()->findOrFail($initiate->json('data.id'));
-        $this->assertSame(PaymentTransactionStatus::Completed, $payment->status);
 
-        $this->assertDatabaseHas('webhook_logs', [
-            'correlation_id' => $webhookCorrelation,
-            'status' => WebhookLogStatus::Processed->value,
+        $this->assertDatabaseHas('activity_logs', [
+            'correlation_id' => $correlationId,
+            'action' => 'verifying',
         ]);
 
         $this->assertDatabaseHas('activity_logs', [
-            'correlation_id' => $webhookCorrelation,
-            'action' => 'completed',
+            'correlation_id' => $correlationId,
+            'action' => 'paid',
         ]);
 
         $this->assertDatabaseHas('outbox_events', [
-            'correlation_id' => $webhookCorrelation,
-            'event_type' => 'payment.completed',
+            'correlation_id' => $correlationId,
+            'event_type' => 'payment.paid',
+        ]);
+
+        $this->assertDatabaseHas('outbox_events', [
+            'correlation_id' => $correlationId,
+            'event_type' => 'order.paid',
         ]);
     }
 
     #[Test]
-    public function webhook_before_redirect_still_completes_payment(): void
+    public function verify_rejects_duplicate_transaction_number_across_payments(): void
+    {
+        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
+        ['order' => $firstOrder] = $this->createPendingOrderForPayments($venue);
+        ['order' => $secondOrder] = $this->createPendingOrderForPayments($venue);
+
+        $transactionNumber = 'TX-E2E-DUP-001';
+        $this->fakeApiSyriaFindTx($transactionNumber);
+
+        ['payment_id' => $firstPaymentId] = $this->createPaymentInstructions($token, $firstOrder);
+        ['payment_id' => $secondPaymentId] = $this->createPaymentInstructions($token, $secondOrder);
+
+        $this->verifyPayment($token, $firstPaymentId, $transactionNumber)->assertOk();
+
+        $this->verifyPayment($token, $secondPaymentId, $transactionNumber)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Transaction number [TX-E2E-DUP-001] has already been used for another payment.');
+
+        $this->assertSame(OrderStatus::Pending, $secondOrder->fresh()->status);
+        $this->assertSame(1, OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'order.paid')->count());
+    }
+
+    #[Test]
+    public function verify_marks_payment_failed_when_transaction_not_found_without_order_update(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
         ['order' => $order] = $this->createPendingOrderForPayments($venue);
 
-        $transactionId = 'SC-E2E-EARLY-WH';
-        $this->fakeSuccessfulShamcashInitiate($transactionId);
+        $transactionNumber = 'TX-E2E-NOT-FOUND';
+        $this->fakeApiSyriaFindTxNotFound($transactionNumber);
 
-        $this->withToken($token)->postJson('/api/tenant/payments', [
-            'order_id' => $order->id,
-            'provider' => 'shamcash',
-        ])->assertCreated();
+        ['payment_id' => $paymentId] = $this->createPaymentInstructions($token, $order);
 
-        $this->postSignedShamcashWebhook([
-            'event_id' => $transactionId,
-            'event_type' => 'payment.completed',
-            'provider_transaction_id' => $transactionId,
-        ])->assertAccepted();
-
-        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
-    }
-
-    #[Test]
-    public function initiate_gateway_failure_allows_retry_after_failed_payment(): void
-    {
-        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
-        ['order' => $order] = $this->createPendingOrderForPayments($venue);
-
-        $this->app->instance(PaymentGatewayRegistry::class, new PaymentGatewayRegistry(
-            paymentGateways: ['shamcash' => new DecliningPaymentGatewayStub],
-            refundGateways: ['shamcash' => new DecliningPaymentGatewayStub],
-            signatureVerifiers: [],
-        ));
-        $this->app->forgetInstance(PaymentGatewayService::class);
-
-        $this->withToken($token)->postJson('/api/tenant/payments', [
-            'order_id' => $order->id,
-            'provider' => 'shamcash',
-        ])->assertStatus(422);
-
-        $this->assertSame(0, PaymentTransaction::withoutGlobalScopes()->count());
-
-        PaymentTransaction::factory()->forOrder($order)->create([
-            'venue_id' => $venue->id,
-            'provider' => 'shamcash',
-            'provider_transaction_id' => 'SC-FAILED-PREV',
-            'amount' => '120.00',
-            'status' => PaymentTransactionStatus::Failed,
-        ]);
-
-        $stub = new CountingShamCashGatewayStub;
-        $this->app->instance(PaymentGatewayRegistry::class, new PaymentGatewayRegistry(
-            paymentGateways: ['shamcash' => $stub],
-            refundGateways: ['shamcash' => $stub],
-            signatureVerifiers: [],
-        ));
-        $this->app->forgetInstance(PaymentGatewayService::class);
-
-        $result = app(PaymentGatewayService::class)->initiatePayment(new GatewayInitiatePaymentData(
-            orderId: $order->id,
-            provider: 'shamcash',
-        ));
-
-        $this->assertSame('shamcash-count-'.$order->id, $result->payment->provider_transaction_id);
-        $this->assertSame(1, $stub->initiateCalls);
-        $this->assertSame(2, PaymentTransaction::withoutGlobalScopes()->count());
-    }
-
-    #[Test]
-    public function initiating_payment_twice_via_api_is_idempotent_for_pending_order_and_provider(): void
-    {
-        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
-        ['order' => $order] = $this->createPendingOrderForPayments($venue);
-
-        $transactionId = 'SC-E2E-IDEM-001';
-        $this->fakeSuccessfulShamcashInitiate($transactionId);
-
-        Http::preventStrayRequests();
-
-        $first = $this->withToken($token)->postJson('/api/tenant/payments', [
-            'order_id' => $order->id,
-            'provider' => 'shamcash',
-        ])->assertCreated();
-
-        $second = $this->withToken($token)->postJson('/api/tenant/payments', [
-            'order_id' => $order->id,
-            'provider' => 'shamcash',
-        ])->assertCreated();
-
-        $this->assertSame($first->json('data.id'), $second->json('data.id'));
-        $this->assertSame($first->json('meta.redirect_url'), $second->json('meta.redirect_url'));
-        $this->assertSame(1, PaymentTransaction::query()->count());
-        $this->assertSame(1, ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('action', 'initiated')->count());
-    }
-
-    #[Test]
-    public function duplicate_webhook_does_not_apply_domain_changes_twice(): void
-    {
-        ['payment' => $payment, 'order' => $order] = $this->seedPendingPayment('shamcash', 'SC-DUP-WH-001');
-
-        $payload = [
-            'event_id' => 'evt_dup_e2e',
-            'event_type' => 'payment.completed',
-            'provider_transaction_id' => 'SC-DUP-WH-001',
-        ];
-
-        $this->postSignedShamcashWebhook($payload)->assertAccepted();
-        $this->postSignedShamcashWebhook($payload)
+        $this->verifyPayment($token, $paymentId, $transactionNumber)
             ->assertOk()
-            ->assertJsonPath('data.duplicate', true);
+            ->assertJsonPath('data.status', PaymentTransactionStatus::Failed->value);
 
-        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
-        $this->assertSame(
-            1,
-            ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('action', 'completed')->count(),
-        );
-        $this->assertSame(
-            1,
-            OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'order.paid')->count(),
-        );
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertSame(0, OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'payment.paid')->count());
+        $this->assertSame(0, OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'order.paid')->count());
+        $this->assertSame(0, ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('action', 'paid')->count());
     }
 
     #[Test]
-    public function invalid_webhook_signature_is_rejected_without_domain_changes(): void
+    public function verify_marks_payment_failed_on_amount_mismatch(): void
     {
-        $this->seedPendingPayment('shamcash', 'SC-BAD-SIG');
-
-        $this->postJson('/webhooks/shamcash', [
-            'event_id' => 'evt_bad_sig_e2e',
-            'event_type' => 'payment.completed',
-            'provider_transaction_id' => 'SC-BAD-SIG',
-        ], ['X-ShamCash-Signature' => 'invalid'])->assertUnauthorized();
-
-        $this->assertSame(OrderStatus::Pending, Order::query()->first()->status);
-        $this->assertDatabaseHas('webhook_logs', [
-            'provider_event_id' => 'evt_bad_sig_e2e',
-            'status' => WebhookLogStatus::FailedSignature->value,
-        ]);
-    }
-
-    #[Test]
-    public function full_refund_flow_via_gateway_and_webhook(): void
-    {
-        ['owner' => $owner, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
+        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
         ['order' => $order] = $this->createPendingOrderForPayments($venue);
 
-        $transactionId = 'SC-E2E-REFUND-FULL';
+        $transactionNumber = 'TX-E2E-AMT-MISMATCH';
+        $this->fakeApiSyriaFindTx($transactionNumber, ['amount' => '50.00']);
 
-        $payment = PaymentTransaction::factory()->forOrder($order)->create([
+        ['payment_id' => $paymentId] = $this->createPaymentInstructions($token, $order);
+
+        $this->verifyPayment($token, $paymentId, $transactionNumber)
+            ->assertOk()
+            ->assertJsonPath('data.status', PaymentTransactionStatus::Failed->value);
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+    }
+
+    #[Test]
+    public function verify_marks_payment_failed_on_currency_mismatch(): void
+    {
+        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
+        ['order' => $order] = $this->createPendingOrderForPayments($venue);
+
+        $transactionNumber = 'TX-E2E-CUR-MISMATCH';
+        $this->fakeApiSyriaFindTx($transactionNumber, ['currency' => 'EUR']);
+
+        ['payment_id' => $paymentId] = $this->createPaymentInstructions($token, $order);
+
+        $this->verifyPayment($token, $paymentId, $transactionNumber)
+            ->assertOk()
+            ->assertJsonPath('data.status', PaymentTransactionStatus::Failed->value);
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+    }
+
+    #[Test]
+    public function verify_expires_payment_without_calling_gateway(): void
+    {
+        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
+        ['order' => $order] = $this->createPendingOrderForPayments($venue);
+
+        Http::fake();
+
+        $payment = PaymentTransaction::factory()->forOrder($order)->awaitingTransfer()->create([
             'venue_id' => $venue->id,
-            'provider' => 'shamcash',
-            'provider_transaction_id' => $transactionId,
+            'provider' => 'apisyria',
             'amount' => '120.00',
-            'status' => PaymentTransactionStatus::Pending,
+            'currency' => 'USD',
+            'expires_at' => now()->subHour(),
         ]);
 
-        $this->postSignedShamcashWebhook([
-            'event_id' => $transactionId,
-            'event_type' => 'payment.completed',
-            'provider_transaction_id' => $transactionId,
-        ])->assertAccepted();
+        $this->verifyPayment($token, $payment->id, 'TX-E2E-EXPIRED')
+            ->assertOk()
+            ->assertJsonPath('data.status', PaymentTransactionStatus::Expired->value);
 
-        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        Http::assertNothingSent();
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+    }
 
-        $this->bindTenant($venue->id);
+    #[Test]
+    public function verify_is_idempotent_for_already_paid_payment(): void
+    {
+        ['token' => $token, 'owner' => $owner, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
+        $venue->update(['commission_rate' => 5.00]);
+        ['order' => $order] = $this->createPendingOrderForPayments($venue);
 
-        $refund = app(RefundService::class)->createRefund(new CreateRefundData(
+        $transactionNumber = 'TX-E2E-IDEM-001';
+        $this->fakeApiSyriaFindTx($transactionNumber);
+
+        ['payment_id' => $paymentId] = $this->createPaymentInstructions($token, $order);
+
+        $this->verifyPayment($token, $paymentId, $transactionNumber)->assertOk();
+        $this->verifyPayment($token, $paymentId, $transactionNumber)->assertOk();
+
+        $this->assertSame(1, PaymentTransaction::query()->where('transaction_number', $transactionNumber)->count());
+
+        $payment = PaymentTransaction::query()->findOrFail($paymentId);
+        $commissionService = app(CommissionService::class);
+
+        $first = $commissionService->recordCommission(new RecordCommissionData(
             orderId: $order->id,
-            amount: '120.00',
+            paymentTransactionId: $payment->id,
+            actor: $owner,
+        ));
+        $second = $commissionService->recordCommission(new RecordCommissionData(
+            orderId: $order->id,
             paymentTransactionId: $payment->id,
             actor: $owner,
         ));
 
-        $providerRefundId = 'SC-REF-E2E-001';
-        $this->fakeSuccessfulShamcashRefund($providerRefundId);
-
-        app(PaymentGatewayService::class)->refund(new GatewayRefundData(
-            refundId: $refund->id,
-            actor: $owner,
-        ));
-
-        $this->postSignedShamcashWebhook([
-            'event_id' => 'evt_refund_e2e',
-            'event_type' => 'refund.processed',
-            'refund_id' => $refund->id,
-            'provider_refund_id' => $providerRefundId,
-        ])->assertAccepted();
-
-        $this->assertSame(RefundStatus::Processed, $refund->fresh()->status);
-        $this->assertSame(OrderStatus::Refunded, $order->fresh()->status);
-    }
-
-    #[Test]
-    public function duplicate_refund_webhook_is_idempotent(): void
-    {
-        ['owner' => $owner, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
-        ['order' => $order] = $this->createPendingOrderForPayments($venue);
-
-        $order->update(['status' => OrderStatus::Paid]);
-
-        $payment = PaymentTransaction::factory()->forOrder($order)->completed()->create([
-            'venue_id' => $venue->id,
-            'provider' => 'shamcash',
-            'provider_transaction_id' => 'SC-REF-DUP',
-            'amount' => '120.00',
-        ]);
-
-        $refund = app(RefundService::class)->createRefund(new CreateRefundData(
-            orderId: $order->id,
-            amount: '120.00',
-            paymentTransactionId: $payment->id,
-            actor: $owner,
-        ));
-
-        $refund->update([
-            'status' => RefundStatus::Pending,
-            'provider_refund_id' => 'SC-REF-DUP-ID',
-        ]);
-
-        $payload = [
-            'event_id' => 'evt_refund_dup',
-            'event_type' => 'refund.processed',
-            'refund_id' => $refund->id,
-            'provider_refund_id' => 'SC-REF-DUP-ID',
-        ];
-
-        $this->postSignedShamcashWebhook($payload)->assertAccepted();
-        $this->postSignedShamcashWebhook($payload)
-            ->assertOk()
-            ->assertJsonPath('data.duplicate', true);
-
-        $this->assertSame(
-            1,
-            ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('action', 'processed')->where('entity_type', Refund::class)->count(),
-        );
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(1, Commission::query()->count());
+        $this->assertSame(1, OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'order.paid')->count());
     }
 
     #[Test]
@@ -359,25 +239,15 @@ class PaymentFlowE2ETest extends TestCase
         $venue->update(['commission_rate' => 5.00]);
         ['order' => $order] = $this->createPendingOrderForPayments($venue);
 
-        $transactionId = 'SC-E2E-COMM-001';
-        $this->fakeSuccessfulShamcashInitiate($transactionId);
+        $transactionNumber = 'TX-E2E-COMM-001';
+        $this->fakeApiSyriaFindTx($transactionNumber);
 
-        $this->withToken($token)->postJson('/api/tenant/payments', [
-            'order_id' => $order->id,
-            'provider' => 'shamcash',
-        ])->assertCreated();
-
-        $this->postSignedShamcashWebhook([
-            'event_id' => $transactionId,
-            'event_type' => 'payment.completed',
-            'provider_transaction_id' => $transactionId,
-        ])->assertAccepted();
+        ['payment_id' => $paymentId] = $this->createPaymentInstructions($token, $order);
+        $this->verifyPayment($token, $paymentId, $transactionNumber)->assertOk();
 
         $this->bindTenant($venue->id);
 
-        $payment = PaymentTransaction::withoutGlobalScopes()
-            ->where('provider_transaction_id', $transactionId)
-            ->firstOrFail();
+        $payment = PaymentTransaction::withoutGlobalScopes()->findOrFail($paymentId);
         $commissionService = app(CommissionService::class);
 
         $first = $commissionService->recordCommission(new RecordCommissionData(
@@ -406,10 +276,11 @@ class PaymentFlowE2ETest extends TestCase
 
         $order->update(['status' => OrderStatus::Paid]);
 
-        $payment = PaymentTransaction::factory()->forOrder($order)->completed()->create([
+        $payment = PaymentTransaction::factory()->forOrder($order)->paid()->create([
             'venue_id' => $venue->id,
-            'provider' => 'shamcash',
-            'provider_transaction_id' => 'SC-COMM-ADJ',
+            'provider' => 'apisyria',
+            'provider_transaction_id' => 'APISYRIA-TX-REFUND',
+            'transaction_number' => 'TX-E2E-REFUND',
             'amount' => '200.00',
         ]);
 
@@ -426,7 +297,7 @@ class PaymentFlowE2ETest extends TestCase
 
         app(RefundService::class)->processRefund(new ProcessRefundData(
             refundId: $refund->id,
-            providerRefundId: 'SC-REF-COMM',
+            providerRefundId: 'APISYRIA-REF-001',
         ));
 
         $commissionService = app(CommissionService::class);
@@ -437,59 +308,32 @@ class PaymentFlowE2ETest extends TestCase
         $this->assertSame($first->id, $second->id);
         $this->assertSame(1, CommissionAdjustment::query()->count());
         $this->assertSame('20.00', $first->adjustment_amount);
+        $this->assertSame(RefundStatus::Processed, $refund->fresh()->status);
     }
 
     #[Test]
-    public function parallel_initiate_requests_create_single_payment_and_single_audit_trail(): void
+    public function initiating_payment_twice_via_api_is_idempotent_for_awaiting_transfer(): void
     {
-        ['venue' => $venue, 'user' => $owner] = $this->createVenueOwner();
-        $this->bindTenant($venue->id);
+        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwnerForPayments();
         ['order' => $order] = $this->createPendingOrderForPayments($venue);
 
-        $stub = new CountingShamCashGatewayStub;
-        $this->app->instance(PaymentGatewayRegistry::class, new PaymentGatewayRegistry(
-            paymentGateways: ['shamcash' => $stub],
-            refundGateways: ['shamcash' => $stub],
-            signatureVerifiers: [],
-        ));
+        Http::preventStrayRequests();
 
-        $service = app(PaymentGatewayService::class);
-        $request = new GatewayInitiatePaymentData(
-            orderId: $order->id,
-            provider: 'shamcash',
-            actor: $owner,
-        );
+        $first = $this->withToken($token)->postJson('/api/tenant/payments', [
+            'order_id' => $order->id,
+            'provider' => 'apisyria',
+        ])->assertCreated();
 
-        $first = $service->initiatePayment($request);
-        $second = $service->initiatePayment($request);
+        $second = $this->withToken($token)->postJson('/api/tenant/payments', [
+            'order_id' => $order->id,
+            'provider' => 'apisyria',
+        ])->assertCreated();
 
-        $this->assertSame(1, $stub->initiateCalls);
-        $this->assertSame($first->payment->id, $second->payment->id);
-        $this->assertSame($first->redirectUrl, $second->redirectUrl);
+        $this->assertSame($first->json('data.payment_id'), $second->json('data.payment_id'));
         $this->assertSame(1, PaymentTransaction::query()->count());
-        $this->assertSame(1, ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('action', 'initiated')->count());
-        $this->assertSame(1, OutboxEvent::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('event_type', 'payment.initiated')->count());
-    }
-
-    /**
-     * @return array{payment: PaymentTransaction, order: Order}
-     */
-    private function seedPendingPayment(string $provider, string $providerTransactionId): array
-    {
-        $this->seedPermissionsCatalog();
-        ['venue' => $venue] = $this->createVenueOwner();
-        $this->bindTenant($venue->id);
-
-        ['order' => $order] = $this->createPendingOrderForPayments($venue);
-
-        $payment = PaymentTransaction::factory()->forOrder($order)->create([
-            'venue_id' => $venue->id,
-            'provider' => $provider,
-            'provider_transaction_id' => $providerTransactionId,
-            'amount' => '120.00',
-            'status' => PaymentTransactionStatus::Pending,
-        ]);
-
-        return ['payment' => $payment, 'order' => $order];
+        $this->assertSame(
+            1,
+            ActivityLog::query()->withoutGlobalScope(BelongsToVenueScope::class)->where('action', 'awaiting_transfer')->count(),
+        );
     }
 }
