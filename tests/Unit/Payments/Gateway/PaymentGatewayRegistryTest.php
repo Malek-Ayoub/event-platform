@@ -13,6 +13,7 @@ use App\DTOs\Payments\Gateway\WebhookPayload;
 use App\DTOs\Payments\Gateway\WebhookVerificationResult;
 use App\Enums\Payments\GatewayOutcome;
 use App\Exceptions\Payments\Gateway\UnknownPaymentProviderException;
+use App\Services\Payments\Gateway\ApiSyria\ApiSyriaGateway;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\Gateway\ShamCash\ShamCashGateway;
 use App\Services\Payments\Gateway\ShamCash\ShamCashSignatureVerifier;
@@ -124,14 +125,16 @@ class PaymentGatewayRegistryTest extends TestCase
         $registry = $this->app->make(PaymentGatewayRegistry::class);
 
         $this->assertEqualsCanonicalizing(
-            ['shamcash', 'syriatel_cash'],
+            ['apisyria', 'shamcash', 'syriatel_cash'],
             $registry->registeredProviders(),
         );
 
         $this->assertInstanceOf(ShamCashGateway::class, $this->app->make(ShamCashGateway::class));
         $this->assertInstanceOf(SyriatelCashGateway::class, $this->app->make(SyriatelCashGateway::class));
+        $this->assertInstanceOf(ApiSyriaGateway::class, $this->app->make(ApiSyriaGateway::class));
         $this->assertInstanceOf(ShamCashSignatureVerifier::class, $this->app->make(ShamCashSignatureVerifier::class));
         $this->assertInstanceOf(SyriatelCashSignatureVerifier::class, $this->app->make(SyriatelCashSignatureVerifier::class));
+        $this->assertSame('apisyria', $registry->verificationGateway('apisyria')->provider());
     }
 
     #[Test]

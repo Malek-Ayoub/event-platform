@@ -16,6 +16,10 @@ readonly class GatewayProviderConfig
         public int $requestTimeout,
         public int $retryAttempts,
         public int $retryDelayMs,
+        // Batch 7.6 — Manual Wallet Transfer (§7.9.4). Optional/defaulted so
+        // existing hosted-checkout providers (ShamCash, Syriatel Cash) are unaffected.
+        public string $merchantAccount = '',
+        public string $verifyTransactionPath = '/find_tx',
     ) {}
 
     public static function forProvider(string $provider): self
@@ -42,6 +46,8 @@ readonly class GatewayProviderConfig
             requestTimeout: (int) ($http['request_timeout'] ?? 30),
             retryAttempts: (int) ($http['retry_attempts'] ?? 2),
             retryDelayMs: (int) ($http['retry_delay_ms'] ?? 250),
+            merchantAccount: (string) ($config['merchant_account'] ?? ''),
+            verifyTransactionPath: (string) ($config['verify_transaction_path'] ?? '/find_tx'),
         );
     }
 }

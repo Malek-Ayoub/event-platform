@@ -64,4 +64,40 @@ class PaymentTransactionFactory extends Factory
             'status' => PaymentTransactionStatus::Failed,
         ]);
     }
+
+    /**
+     * Manual Wallet Transfer states (§7.9 — Batch 7.6).
+     */
+    public function awaitingTransfer(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider_transaction_id' => null,
+            'transaction_number' => null,
+            'status' => PaymentTransactionStatus::AwaitingTransfer,
+            'expires_at' => now()->addHours(24),
+        ]);
+    }
+
+    public function verifying(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'transaction_number' => 'TX-'.Str::upper(fake()->unique()->bothify('########')),
+            'status' => PaymentTransactionStatus::Verifying,
+        ]);
+    }
+
+    public function paid(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => PaymentTransactionStatus::Paid,
+        ]);
+    }
+
+    public function expired(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => PaymentTransactionStatus::Expired,
+            'expires_at' => now()->subHour(),
+        ]);
+    }
 }

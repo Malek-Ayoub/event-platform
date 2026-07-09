@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $venue_id
  * @property int $order_id
  * @property PaymentTransactionStatus $status
+ * @property string|null $transaction_number Customer-submitted transaction number (Manual Wallet Transfer, §7.9)
+ * @property \Illuminate\Support\Carbon|null $expires_at Payment instruction expiry (Manual Wallet Transfer, §7.9)
  */
 class PaymentTransaction extends Model
 {
@@ -27,9 +29,11 @@ class PaymentTransaction extends Model
         'order_id',
         'provider',
         'provider_transaction_id',
+        'transaction_number',
         'amount',
         'currency',
         'status',
+        'expires_at',
         'payload',
     ];
 
@@ -40,9 +44,11 @@ class PaymentTransaction extends Model
             'order_id' => 'integer',
             'provider' => 'string',
             'provider_transaction_id' => 'string',
+            'transaction_number' => 'string',
             'amount' => 'decimal:2',
             'currency' => 'string',
             'status' => PaymentTransactionStatus::class,
+            'expires_at' => 'datetime',
             'payload' => 'array',
         ];
     }

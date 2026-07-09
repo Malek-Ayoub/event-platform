@@ -6,6 +6,7 @@ use App\Domain\Correlation\Contracts\CorrelationContextInterface;
 use App\Domain\Tenancy\Contracts\TenantContextInterface;
 use App\DTOs\Payments\Gateway\InitiatePaymentResponse;
 use App\DTOs\Payments\Gateway\RefundResponse;
+use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
 use App\DTOs\Payments\Gateway\WebhookPayload;
 use App\DTOs\Webhooks\IncomingWebhookData;
 use App\DTOs\Webhooks\WebhookHandleResult;
@@ -26,12 +27,16 @@ use App\Services\Payments\Data\FailPaymentData;
 use App\Services\Payments\Data\GatewayInitiatePaymentData;
 use App\Services\Payments\Data\GatewayInitiatePaymentResult;
 use App\Services\Payments\Data\GatewayRefundData;
+use App\Services\Payments\Data\GatewayVerifyTransactionData;
 use App\Services\Payments\Data\InitiatePaymentData;
+use App\Services\Payments\Data\TransactionVerificationResult;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\Gateway\Support\GatewayProviderMetadata;
 use App\Services\Payments\Mapping\InitiatePaymentRequestMapper;
 use App\Services\Payments\Mapping\InitiatePaymentResponseMapper;
 use App\Services\Payments\Mapping\RefundRequestMapper;
+use App\Services\Payments\Mapping\VerifyTransactionRequestMapper;
+use App\Services\Payments\Mapping\VerifyTransactionResponseMapper;
 use App\Services\Refunds\Data\ProcessRefundData;
 use App\Services\Refunds\Data\SubmitRefundData;
 use App\Services\Refunds\RefundService;
@@ -61,83 +66,87 @@ final class PaymentGatewayService
         private InitiatePaymentRequestMapper $initiatePaymentRequestMapper,
         private InitiatePaymentResponseMapper $initiatePaymentResponseMapper,
         private RefundRequestMapper $refundRequestMapper,
+        private VerifyTransactionRequestMapper $verifyTransactionRequestMapper,
+        private VerifyTransactionResponseMapper $verifyTransactionResponseMapper,
     ) {}
 
     public function initiatePayment(GatewayInitiatePaymentData $data): GatewayInitiatePaymentResult
     {
-        $order = Order::query()->whereKey($data->orderId)->firstOrFail();
         $provider = strtolower(trim($data->provider));
 
-        $pending = PaymentTransaction::query()
-            ->where('order_id', $order->id)
-            ->where('provider', $provider)
-            ->where('status', PaymentTransactionStatus::Pending)
-            ->first();
+        $pending = $this->findPendingPayment($data->orderId, $provider);
 
         if ($pending !== null) {
-            return new GatewayInitiatePaymentResult(
-                payment: $pending,
-                redirectUrl: $this->redirectUrlFromPayload($pending->payload),
-            );
+            return $this->resultFromPending($pending);
         }
 
-        try {
-            $gateway = $this->registry->paymentGateway($provider);
-        } catch (UnknownPaymentProviderException $exception) {
-            throw GatewayOperationException::forInitiate(
+        return $this->transactionRunner->run(function () use ($data, $provider): GatewayInitiatePaymentResult {
+            $order = Order::query()->whereKey($data->orderId)->lockForUpdate()->firstOrFail();
+
+            $pending = $this->findPendingPayment((int) $order->id, $provider);
+
+            if ($pending !== null) {
+                return $this->resultFromPending($pending);
+            }
+
+            try {
+                $gateway = $this->registry->paymentGateway($provider);
+            } catch (UnknownPaymentProviderException $exception) {
+                throw GatewayOperationException::forInitiate(
+                    provider: $provider,
+                    outcome: GatewayOutcome::ProviderError,
+                    reason: $exception->getMessage(),
+                );
+            }
+
+            $amount = $this->resolveAmount($order, $data);
+            $currency = $this->resolveCurrency($order, $data);
+
+            $gatewayRequest = $this->initiatePaymentRequestMapper->toGatewayRequest(
+                orderId: (int) $order->id,
+                amount: $amount,
+                currency: $currency,
+                metadata: $data->metadata ?? [],
+            );
+            $gatewayResponse = $gateway->initiate($gatewayRequest);
+
+            $this->assertSuccessfulInitiate($provider, $gatewayResponse);
+
+            $domainData = $this->initiatePaymentResponseMapper->toDomainData(
+                response: $gatewayResponse,
+                orderId: (int) $order->id,
                 provider: $provider,
-                outcome: GatewayOutcome::ProviderError,
-                reason: $exception->getMessage(),
+                amount: $amount,
+                currency: $currency,
+                metadata: $data->metadata,
             );
-        }
 
-        $amount = $this->resolveAmount($order, $data);
-        $currency = $this->resolveCurrency($order, $data);
+            $domainData = new InitiatePaymentData(
+                orderId: $domainData->orderId,
+                provider: $domainData->provider,
+                providerTransactionId: $domainData->providerTransactionId,
+                amount: $domainData->amount,
+                currency: $domainData->currency,
+                payload: $domainData->payload,
+                actor: $data->actor,
+                ipAddress: $data->ipAddress,
+            );
 
-        $gatewayRequest = $this->initiatePaymentRequestMapper->toGatewayRequest(
-            orderId: (int) $order->id,
-            amount: $amount,
-            currency: $currency,
-            metadata: $data->metadata ?? [],
-        );
-        $gatewayResponse = $gateway->initiate($gatewayRequest);
+            $this->correlationContext->bind(
+                PaymentCorrelation::forProviderTransaction($provider, $gatewayResponse->providerTransactionId),
+            );
 
-        $this->assertSuccessfulInitiate($provider, $gatewayResponse);
+            try {
+                $payment = $this->paymentService->initiatePayment($domainData);
+            } finally {
+                $this->correlationContext->clear();
+            }
 
-        $domainData = $this->initiatePaymentResponseMapper->toDomainData(
-            response: $gatewayResponse,
-            orderId: (int) $order->id,
-            provider: $provider,
-            amount: $amount,
-            currency: $currency,
-            metadata: $data->metadata,
-        );
-
-        $domainData = new InitiatePaymentData(
-            orderId: $domainData->orderId,
-            provider: $domainData->provider,
-            providerTransactionId: $domainData->providerTransactionId,
-            amount: $domainData->amount,
-            currency: $domainData->currency,
-            payload: $domainData->payload,
-            actor: $data->actor,
-            ipAddress: $data->ipAddress,
-        );
-
-        $this->correlationContext->bind(
-            PaymentCorrelation::forProviderTransaction($provider, $gatewayResponse->providerTransactionId),
-        );
-
-        try {
-            $payment = $this->paymentService->initiatePayment($domainData);
-        } finally {
-            $this->correlationContext->clear();
-        }
-
-        return new GatewayInitiatePaymentResult(
-            payment: $payment,
-            redirectUrl: $gatewayResponse->redirectUrl,
-        );
+            return new GatewayInitiatePaymentResult(
+                payment: $payment,
+                redirectUrl: $gatewayResponse->redirectUrl,
+            );
+        });
     }
 
     public function refund(GatewayRefundData $data): Refund
@@ -203,6 +212,49 @@ final class PaymentGatewayService
                 actor: $data->actor,
                 ipAddress: $data->ipAddress,
             ));
+        } finally {
+            $this->correlationContext->clear();
+        }
+    }
+
+    public function verifyTransaction(GatewayVerifyTransactionData $data): TransactionVerificationResult
+    {
+        $provider = strtolower(trim($data->provider));
+
+        try {
+            $gateway = $this->registry->verificationGateway($provider);
+        } catch (UnknownPaymentProviderException $exception) {
+            throw GatewayOperationException::forVerify(
+                provider: $provider,
+                outcome: GatewayOutcome::ProviderError,
+                reason: $exception->getMessage(),
+            );
+        }
+
+        $gatewayRequest = $this->verifyTransactionRequestMapper->toGatewayRequest(
+            transactionNumber: $data->transactionNumber,
+            expectedAmount: $data->expectedAmount,
+            expectedCurrency: $data->expectedCurrency,
+            merchantAccount: $data->merchantAccount,
+        );
+
+        $gatewayResponse = $gateway->verifyTransaction($gatewayRequest);
+
+        $this->assertSuccessfulVerifyLookup($provider, $gatewayResponse);
+
+        if ($gatewayResponse->providerTransactionId !== null && $gatewayResponse->providerTransactionId !== '') {
+            $this->correlationContext->bind(
+                PaymentCorrelation::forProviderTransaction($provider, $gatewayResponse->providerTransactionId),
+            );
+        }
+
+        try {
+            return $this->verifyTransactionResponseMapper->toDomainResult(
+                response: $gatewayResponse,
+                expectedAmount: $data->expectedAmount,
+                expectedCurrency: $data->expectedCurrency,
+                expectedReceiverAccount: $data->merchantAccount,
+            );
         } finally {
             $this->correlationContext->clear();
         }
@@ -428,6 +480,19 @@ final class PaymentGatewayService
         );
     }
 
+    private function assertSuccessfulVerifyLookup(string $provider, VerifyTransactionResponse $response): void
+    {
+        if ($response->outcome === GatewayOutcome::Success) {
+            return;
+        }
+
+        throw GatewayOperationException::forVerify(
+            provider: $provider,
+            outcome: $response->outcome,
+            reason: $this->gatewayFailureReason($response->providerMetadata, 'Provider rejected transaction lookup'),
+        );
+    }
+
     private function isImmediateRefundCompletion(string $status): bool
     {
         return in_array(strtolower($status), ['completed', 'processed', 'success'], true);
@@ -485,5 +550,22 @@ final class PaymentGatewayService
         $redirectUrl = (string) $payload['redirect_url'];
 
         return $redirectUrl !== '' ? $redirectUrl : null;
+    }
+
+    private function findPendingPayment(int $orderId, string $provider): ?PaymentTransaction
+    {
+        return PaymentTransaction::query()
+            ->where('order_id', $orderId)
+            ->where('provider', $provider)
+            ->where('status', PaymentTransactionStatus::Pending)
+            ->first();
+    }
+
+    private function resultFromPending(PaymentTransaction $pending): GatewayInitiatePaymentResult
+    {
+        return new GatewayInitiatePaymentResult(
+            payment: $pending,
+            redirectUrl: $this->redirectUrlFromPayload($pending->payload),
+        );
     }
 }

@@ -35,4 +35,19 @@ final class GatewayOperationException extends RuntimeException
             operation: 'refund',
         );
     }
+
+    /**
+     * Batch 7.6 — Manual Wallet Transfer. Thrown only for technical lookup
+     * failures (network/provider/timeout) — a business "transaction not found"
+     * result is not an exception, see `TransactionVerificationResult` (§7.9.6).
+     */
+    public static function forVerify(string $provider, GatewayOutcome $outcome, string $reason): self
+    {
+        return new self(
+            message: "Transaction verification failed for provider [{$provider}]: {$reason}",
+            provider: $provider,
+            outcome: $outcome,
+            operation: 'verify',
+        );
+    }
 }

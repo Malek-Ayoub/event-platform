@@ -7,6 +7,7 @@ use App\DTOs\Payments\Gateway\InitiatePaymentRequest;
 use App\DTOs\Payments\Gateway\InitiatePaymentResponse;
 use App\DTOs\Payments\Gateway\RefundRequest;
 use App\DTOs\Payments\Gateway\RefundResponse;
+use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
 use App\Enums\Payments\GatewayOutcome;
 use App\Exceptions\Payments\Gateway\GatewayTransportException;
 use Throwable;
@@ -113,6 +114,46 @@ final class GatewayResponseMapper
                     'response' => $raw,
                 ], static fn ($value) => $value !== null),
             ),
+        );
+    }
+
+    /**
+     * Batch 7.6 — Manual Wallet Transfer. `found` reflects the provider's own
+     * lookup result — a technical HTTP failure still yields `outcome !=
+     * Success` (handled by the caller via `GatewayOperationException::forVerify`).
+     *
+     * @param  array<string, mixed>  $raw
+     */
+    public function verifyTransactionResult(
+        bool $found,
+        ?string $amount = null,
+        ?string $currency = null,
+        ?string $receiverAccount = null,
+        ?string $providerTransactionId = null,
+        ?string $rawStatus = null,
+        array $raw = [],
+    ): VerifyTransactionResponse {
+        return new VerifyTransactionResponse(
+            outcome: GatewayOutcome::Success,
+            found: $found,
+            amount: $amount,
+            currency: $currency,
+            receiverAccount: $receiverAccount,
+            providerTransactionId: $providerTransactionId,
+            rawStatus: $rawStatus,
+            providerMetadata: ['raw' => $raw],
+        );
+    }
+
+    public function verifyTransactionTransportFailure(GatewayOutcome $outcome, string $errorMessage, ?int $httpStatus = null): VerifyTransactionResponse
+    {
+        return new VerifyTransactionResponse(
+            outcome: $outcome,
+            found: false,
+            providerMetadata: array_filter([
+                'error' => $errorMessage,
+                'http_status' => $httpStatus,
+            ], static fn ($value) => $value !== null),
         );
     }
 

@@ -12,6 +12,7 @@ use App\Models\PaymentTransaction;
 use App\Models\Refund;
 use App\Services\Payments\Data\GatewayInitiatePaymentData;
 use App\Services\Payments\Data\GatewayRefundData;
+use App\Services\Payments\Data\GatewayVerifyTransactionData;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\Gateway\Stubs\ShamCashGatewayStub;
 use App\Services\Payments\Gateway\Stubs\SyriatelCashGatewayStub;
@@ -274,6 +275,32 @@ class PaymentGatewayServiceTest extends TestCase
 
         $this->assertSame(RefundStatus::Processed, $processed->status);
         $this->assertSame(OrderStatus::Refunded, $order->fresh()->status);
+    }
+
+    #[Test]
+    public function verify_transaction_maps_gateway_lookup_to_domain_result(): void
+    {
+        config(['payment_gateways.providers.apisyria.merchant_account' => 'WALLET-001']);
+
+        $this->app->instance(PaymentGatewayRegistry::class, new PaymentGatewayRegistry(
+            paymentGateways: [],
+            refundGateways: [],
+            signatureVerifiers: [],
+            verificationGateways: [
+                'apisyria' => new ApiSyriaVerificationGatewayStub,
+            ],
+        ));
+
+        $result = app(PaymentGatewayService::class)->verifyTransaction(new GatewayVerifyTransactionData(
+            provider: 'apisyria',
+            transactionNumber: 'TX-VERIFY-1',
+            expectedAmount: '50.00',
+            expectedCurrency: 'USD',
+            merchantAccount: 'WALLET-001',
+        ));
+
+        $this->assertTrue($result->matched);
+        $this->assertSame('APISYRIA-TX-VERIFY-1', $result->providerTransactionId);
     }
 
     private function swapRegistryWithStub(

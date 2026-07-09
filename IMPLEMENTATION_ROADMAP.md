@@ -64,7 +64,7 @@
 | 4 | **Domain Models & Authorization** | كل Eloquent Models + علاقات + Policies + RBAC كامل | ✅ |
 | 5 | **Domain Services** | `TransactionRunner`, Services, Actions, DTOs (§5.1–§5.9) — **لا** Repository/CQRS/ES | ✅ |
 | 6 | **APIs (Business Controllers)** | Events, Ticket Types, Orders, Reservations, Products, Coupons, … | ✅ 6.1–6.8 |
-| 7 | **Payments** | Gateway, Webhooks, Refunds, Commission Adjustments | ⏳ 7.1–7.5 |
+| 7 | **Payments** | Gateway, Manual Wallet Transfer Verification, Refunds, Commission Adjustments | ⏳ 7.1–7.8 (نموذج الدفع تغيّر إلى Manual Wallet Transfer — انظر §7.9) |
 | 8 | **Notifications** | Email, SMS, Templates, Outbox Worker | — |
 | 9 | **Production Hardening** | Performance, Queues, Monitoring, Security, Load Testing | — |
 
@@ -853,17 +853,24 @@ PaymentService / RefundService  →  Domain state (SSOT داخلي)
 ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 ```
 
+> **⚠️ تحديث معماري (Amendment — بناءً على وثائق API Syria الرسمية):**
+> نموذج الدفع الفعلي (Payment Initiation) تغيّر من **Hosted Checkout + Redirect + Webhooks** إلى **Manual Wallet Transfer + Transaction Verification**. البنود §7.1–§7.7 أدناه تبقى **مرجعًا تاريخيًا** (توثّق كيف بُني Batch 7.1–7.5 فعليًا وتم إنجازه واختباره)، لكنها **لا تصف مسار الدفع الحالي بعد الآن**. المرجع المعماري الحاكم لمسار الدفع من الآن فصاعدًا هو **§7.9**. لا تُعاد كتابة §7.1–§7.7 — تُترك كسجل تاريخي (traceability)، وتُشار إليها بـ "(legacy / superseded by §7.9)" حيث يلزم.
+
 ##### §7.0 — ترتيب تنفيذ Phase 7 (_batches)
 
 | Batch | المحتوى | يعتمد على | الحالة |
 |---|---|---|---|
-| **7.1** | Payment Gateway Abstractions (Interfaces + DTOs + Registry) | — | ✅ |
-| **7.2** | Gateway Implementations (ShamCash, Syriatel Cash, …) | 7.1 | ✅ |
-| **7.3** | Webhook Infrastructure (Signature Verification + Replay Protection) | 7.2 | ✅ |
-| **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | ✅ |
-| **7.5** | End-to-End Integration + `GatewayArchitectureGuardTest` | 7.1–7.4 | — |
+| **7.1** | Payment Gateway Abstractions (Interfaces + DTOs + Registry) | — | ✅ (legacy — الجزء الخاص بـ Registry/Contracts الأساسية لا يزال ساريًا؛ `initiate`/webhook DTOs أصبحت legacy) |
+| **7.2** | Gateway Implementations (ShamCash, Syriatel Cash, …) | 7.1 | ✅ (legacy — hosted checkout + signature verifier؛ superseded by §7.9) |
+| **7.3** | Webhook Infrastructure (Signature Verification + Replay Protection) | 7.2 | ✅ (legacy — لا مزيد من Webhooks؛ superseded by §7.9) |
+| **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | ✅ (legacy — `initiatePayment()`/`handleWebhook()` تُستبدَل بـ `verifyTransaction()` orchestration §7.9.4) |
+| **7.5** | End-to-End Integration + `GatewayArchitectureGuardTest` | 7.1–7.4 | ✅ (legacy — يُستبدَل E2E الخاص بمسار hosted checkout بـ E2E جديد لمسار Manual Transfer، §7.9.11) |
+| **7.6** | Gateway Contract Redesign (`verifyTransaction`) + Verification DTOs + `PaymentTransactionStatus` state machine الجديدة + `PaymentInstructionService`/`PaymentVerificationService` + Architecture Guards + global `transaction_number` uniqueness (§7.9.6.1) | 7.1 (Registry/Contracts فقط) | ✅ |
+| **7.7** | API Wiring: `PaymentController::store()` مُعدَّل + `PaymentController::verify()` جديد + Routes + Requests + Resources/OpenAPI + Deprecation صريح لـ `complete`/`fail` | 7.6 | ⏳ Planned |
+| **7.8** | Manual Transfer E2E Integration (`PaymentFlowE2ETest` الجديد لمسار Manual Transfer) | 7.6–7.7 | ⏳ Planned |
+| **7.9** *(Cleanup — batch مستقل)* | إزالة فعلية للكود Legacy الخامل (Hosted checkout gateways, signature verifiers, `WebhookController` إن قُرِّر إزالته لاحقًا) — **فقط** بعد اكتمال 7.6–7.8 واختبارها في الإنتاج | 7.6–7.8 | ⏳ Planned (لا تُنفَّذ قبل استقرار المسار الجديد) |
 
-كل batch ينتهي باختبارات خضراء قبل التالي.
+كل batch ينتهي باختبارات خضراء قبل التالي. **تفاصيل Batches 7.6–7.9 في §7.9 (subsection) أدناه.** *(ملاحظة تسمية: "Batch 7.9" و subsection "§7.9" رقمان مستقلان — الأول رقم دفعة تنفيذية، الثاني رقم قسم في هذه الوثيقة يوثّق كل الدفعات 7.6–7.9).*
 
 ---
 
@@ -1065,7 +1072,30 @@ match ($provider) { 'syriatel_cash' => ... };  // ❌
 
 ---
 
-##### §7.5 — Gateway Abstractions (7.1 — هيكل مقترح)
+##### §7.5 — End-to-End Integration (Batch 7.5) ✅
+
+**ملف:** `tests/Feature/Payments/PaymentFlowE2ETest.php`
+
+| Category | Scenario | Covered |
+|---|---|---|
+| Payment | Initiate → Redirect → Webhook → Paid | ✅ |
+| Payment | Initiate → Gateway Failure → Retry | ✅ |
+| Payment | Initiate twice `(order_id, provider)` | ✅ |
+| Payment | Race / lock: duplicate initiate under order lock | ✅ |
+| Webhook | Duplicate webhook → single domain effect | ✅ |
+| Webhook | Webhook before redirect | ✅ |
+| Webhook | Invalid signature | ✅ |
+| Refund | Full refund (gateway + webhook) | ✅ |
+| Refund | Duplicate refund webhook | ✅ |
+| Commission | Single commission after paid (worker simulation) | ✅ |
+| Commission | Single adjustment after refund (worker simulation) | ✅ |
+| Correlation | Shared `{provider}:{reference}` across initiate + webhook | ✅ |
+
+**ملاحظة:** Commission/Adjustment تُستدعى صراحةً في الاختبار (محاكاة Phase 8 Outbox Worker) — لا wiring إنتاجي جديد.
+
+---
+
+##### §7.5 (legacy) — Gateway Abstractions (7.1 — هيكل مقترح)
 
 ```
 app/
@@ -1115,7 +1145,7 @@ app/
 
 ---
 
-##### §7.7 — Exit Criteria (Phase 7 كاملة)
+##### §7.7 — Exit Criteria (Phase 7 كاملة) — **(legacy — يصف مسار hosted checkout، مُستبدَل بـ §7.9.11)**
 
 | # | Criterion |
 |---|---|
@@ -1128,11 +1158,328 @@ app/
 
 ---
 
-**محتوى Phase 7 (ملخص):**
+**محتوى Phase 7 (ملخص) — legacy، مسار hosted checkout كما نُفِّذ في Batch 7.1–7.5:**
 - Payment Gateway integration, `payment_transactions` (عبر PaymentService — SSOT).
 - Webhooks (signature §56, idempotency §51, replay §7.3).
 - Refunds + `commission_adjustments` (§52) — عبر RefundService.
 - Commissions (append-only) — بدون تغيير Phase 5 rules.
+
+**مسار الدفع الفعلي الحالي (SSOT) موصوف في §7.9 أدناه — بند "محتوى Phase 7" النهائي الصحيح هو §7.9.12.**
+
+---
+
+##### §7.9 — تحديث معماري: نموذج الدفع اليدوي عبر المحفظة (Manual Wallet Transfer — API Syria)
+
+**الحالة:** ⏳ مُوثَّق، بانتظار موافقة نهائية على الوثيقة قبل بدء أي تنفيذ (per طلب المستخدم — "Do NOT start coding immediately").
+
+**السبب:** توثيق API Syria الرسمي لا يوفّر hosted checkout / redirect / webhooks. الدفع الوحيد المتاح هو: العميل يحوّل المال يدويًا إلى محفظة التاجر، ثم يُرسل رقم العملية (transaction number)، والنظام يتحقق منه عبر واجهة `find_tx` الخاصة بـ API Syria.
+
+---
+
+###### §7.9.1 — SSOT Flow (الجديد — يستبدل تدفق §7.2)
+
+```
+Order (status = pending)
+        ↓
+PaymentInstructionService.createInstructions(order)
+        ↓
+PaymentTransaction (status = awaiting_transfer) + PaymentInstructionData
+        ↓
+Response → Customer يرى: merchant wallet / amount / currency / expires_at / instructions
+        ↓
+[Customer يحوّل المال يدويًا خارج النظام — لا فعل من طرف النظام هنا]
+        ↓
+Customer → POST /payments/{payment}/verify { transaction_number }
+        ↓
+PaymentVerificationService.verify(payment, transactionNumber)
+        ↓
+PaymentTransaction (status = verifying)
+        ↓
+PaymentGatewayService.verifyTransaction(...)   ← Anti-Corruption Layer (بدون تغيير مبدأ §7.1)
+        ↓
+PaymentGatewayRegistry → Gateway Contract (PaymentGateway::verifyTransaction) → API Syria find_tx
+        ↓
+Gateway DTO (TransactionVerificationResult) → Domain DTO
+        ↓
+PaymentVerificationService يطبّق قواعد التحقق (§7.9.6) على النتيجة
+        ↓
+   نجاح ─────────────────────────────► فشل / عدم تطابق
+        ↓                                        ↓
+PaymentService.completePayment()        PaymentService.failPayment()
+        ↓                                        ↓
+PaymentTransaction = paid                PaymentTransaction = failed
+Order = paid (SSOT §Phase 5)             Order يبقى pending (قابل لإعادة المحاولة)
+        ↓
+ActivityLog + Outbox (عبر TransactionRunner — بدون تغيير Phase 5)
+```
+
+**لا** hosted checkout، **لا** redirect URL، **لا** webhook endpoint، **لا** signature verification لهذا المسار.
+
+---
+
+###### §7.9.2 — العناصر المُلغاة/المُستبدَلة من Batch 7.1–7.5 (Superseded)
+
+| عنصر (Legacy) | القرار | البديل |
+|---|---|---|
+| `PaymentGatewayService::initiatePayment()` | يُلغى لمسار hosted-checkout | `PaymentGatewayService::verifyTransaction()` (§7.9.4) |
+| `PaymentGatewayService::handleWebhook()` + كل webhook pipeline (§7.2–§7.3) | **Dormant** — لا يُستدعى من أي مسار إنتاجي جديد؛ **لا حذف** في Batch 7.6–7.8 | لا مقابل لمسار الدفع الحالي؛ يبقى متاحًا (dormant) لمزوّدين مستقبليين قد يدعمون callbacks/webhooks |
+| `WebhookController`, `routes/webhooks.php` | **قرار نهائي: Dormant, not deleted** — يبقى معزولًا وغير نشط؛ لا مسار إنتاجي حالي يعتمد عليه | حذف فعلي فقط في **Batch 7.9 (Cleanup)** المستقل، وبعد استقرار المسار الجديد فقط — إن قرَّر المستخدم لاحقًا |
+| `WebhookService`, `WebhookLogService`, `ReplayProtectionService` | **Dormant, not deleted** — البنية التحتية العامة لـ webhooks تبقى جزءًا من منصة الدفع العامة لمزوّدين مستقبليين | منطق uniqueness لمسار Manual Transfer الجديد = "transaction_number لم يُستخدم سابقًا" (§7.9.6) — **لا** علاقة بـ `webhook_logs` |
+| `GatewaySignatureVerifier` (contract) + `ShamCashSignatureVerifier`/`SyriatelCashSignatureVerifier` | **Dormant, not deleted** — API Syria الحالي لا يوفّر webhooks، لذا لا يُستخدَم فعليًا، لكن يبقى متاحًا لمزوّدين آخرين قد يدعمون توقيع callbacks | لا توقيع HMAC/RSA لمسار Manual Transfer — التحقق يتم عبر استعلام `find_tx` مباشرة (server-to-server، لا webhook وارد) |
+| `WebhookDomainCommandMapperRegistry` + `PaymentCompletedMapper`/`PaymentFailedMapper`/`RefundProcessedMapper` | **Dormant, not deleted** لنفس السبب أعلاه | لا mapping لأحداث واردة في مسار Manual Transfer؛ الاستجابة من `verifyTransaction()` تُعالَج synchronously ضمن نفس الطلب (لا event mapping) |
+| `WebhookLog` model + جدول `webhook_logs` | **قرار نهائي: Dormant, not deleted.** يبقى جزءًا من منصة الدفع العامة (مزوّدون مستقبليون قد يدعمون webhooks) — **ممنوع** على أي كود إنتاجي في مسار Manual Transfer (`PaymentInstructionService`, `PaymentVerificationService`, `PaymentGatewayService::verifyTransaction()`) الإشارة إلى `WebhookLog`/`WebhookLogService` (مُطبَّق كـ Architecture Guard §7.9.9) | — |
+| `InitiatePaymentDTO`, `InitiatePaymentRequest`, `GatewayInitiatePaymentData/Result`, `WebhookPayload`, `WebhookVerificationResult` | **Dormant, not deleted** — تبقى مستخدَمة نظريًا من مسار hosted-checkout الخامل | `PaymentInstructionData`, `VerifyTransactionData`, `VerifyTransactionResult` (§7.9.5) هي DTOs مسار Manual Transfer الحالي |
+| `RefundGateway` contract + refund gateway flow (§7.4) | **خارج نطاق هذا التحديث بالكامل — قرار نهائي.** API Syria يوثّق حاليًا فقط lookup + wallet transfer؛ لا refund. **لا** تعديل على `RefundGateway`/`RefundService`/refund orchestration في أي Batch من 7.6–7.9 | بدون تغيير — يُعاد تقييمه فقط إذا وثّق API Syria قدرة refund لاحقًا |
+| `GatewayArchitectureGuardTest` | **لا يُحذف** — يُحدَّث ليعكس القواعد الجديدة (§7.9.9)، بما فيها حراسة عدم استخدام dormant webhook code من مسار Manual Transfer | نفس الملف، حراسات مُحدَّثة (إضافة، لا حذف الحراسات القديمة الخاصة بـ webhook التي تبقى صحيحة لمكوّنات dormant) |
+| Correlation IDs / ActivityLog / Outbox / TransactionRunner / DTO boundaries / Controller thinness / Registry pattern | **بدون تغيير** (per "DO NOT CHANGE" في طلب المستخدم) | — |
+
+**قرار نهائي (تمت الموافقة من المستخدم):** لا حذف فعلي لأي كود Legacy/Webhook في Batch 7.6/7.7/7.8. الحذف الفعلي (إن حدث) يقع فقط في **Batch 7.9 — Cleanup** المستقل، بعد اكتمال واستقرار المسار الجديد بالكامل في الإنتاج. حتى ذلك الحين: الكود القديم يبقى **معزولًا وخاملًا (isolated & dormant)** — لا مسار إنتاجي جديد يستدعيه أو يعتمد عليه.
+
+---
+
+###### §7.9.3 — Service Ownership الجديد (يُحدِّث جدول §7.1)
+
+| Service | مسؤولية | **لا** يفعل |
+|---|---|---|
+| `PaymentInstructionService` | إصدار تعليمات الدفع: محفظة التاجر، العملة، المبلغ، `expires_at`، نص تعليمات human-readable؛ إنشاء `PaymentTransaction` بحالة `awaiting_transfer` | **لا** استدعاء Gateway؛ **لا** التحقق من transaction number؛ **لا** `Model::save()` مباشر خارج DTO التنسيق (يُفوَّض لـ `PaymentService`) |
+| `PaymentVerificationService` | استقبال `transaction_number` من العميل → تحميل `PaymentTransaction` → استدعاء `PaymentGatewayService::verifyTransaction()` → تطبيق قواعد التحقق (§7.9.6) على النتيجة → عند النجاح: `PaymentService::completePayment()`؛ عند الفشل: `PaymentService::failPayment()` | **لا** استدعاء Registry/Gateway contracts مباشرة (فقط عبر `PaymentGatewayService`)؛ **لا** `Model::save()` مباشر على `Order`/`PaymentTransaction` |
+| `PaymentGatewayService` | **Anti-Corruption Layer (بدون تغيير المبدأ)** — الوحيد المسموح له باستخدام `PaymentGatewayRegistry` + `PaymentGateway` contract؛ `verifyTransaction()` orchestration: استدعاء Gateway → map Gateway DTO → Domain DTO | `Model::save()`, ActivityLog, Outbox؛ **لا** `if ($provider === 'shamcash')` (نفس قاعدة §7.4) |
+| `PaymentService` | حالة الدفع **داخل النظام** (`PaymentTransaction`, `Order.status` SSOT) — بدون تغيير عن Phase 5/7.1، مع إضافة `completePayment()`/`failPayment()` إذا لم تكن موجودة بهذا الاسم | استدعاء HTTP للـ Gateway مباشرة |
+| `RefundService` | **بدون تغيير** — خارج نطاق هذا التحديث (§7.9.2) | — |
+
+**قاعدة الوصول لا تتغيّر:** Controllers → `PaymentInstructionService` / `PaymentVerificationService` فقط. **لا** Controller يستدعي `PaymentGatewayService` أو Registry مباشرة (Controller thinness — بدون تغيير).
+
+```
+Controller → PaymentInstructionService  →  PaymentService (create awaiting_transfer)
+Controller → PaymentVerificationService →  PaymentGatewayService → Registry → Gateway Contract
+                                        →  PaymentService (complete/fail)
+```
+
+---
+
+###### §7.9.4 — Gateway Contract Redesign
+
+**يُستبدَل** `PaymentGateway::initiate()` (hosted checkout) بـ:
+
+```php
+interface PaymentGateway
+{
+    public function provider(): string;
+
+    public function verifyTransaction(VerifyTransactionRequest $request): VerifyTransactionResponse;
+}
+```
+
+- `VerifyTransactionRequest` (Gateway DTO): `transactionNumber`, `expectedAmount`, `expectedCurrency`, `merchantAccount`.
+- `VerifyTransactionResponse` (Gateway DTO): نتيجة خام من `find_tx` — `found`, `amount`, `currency`, `receiverAccount`, `providerTransactionId`, `rawStatus`.
+- **`GatewaySignatureVerifier` يُحذف من الاستخدام لهذا المسار** — لا webhook وارد يحتاج توقيعًا. (لا يُحذف الملف تلقائيًا؛ القرار النهائي جزء من §7.9.2).
+- Registry access rule **بدون تغيير**: فقط `PaymentGatewayService` يستدعي `PaymentGatewayRegistry` + `PaymentGateway` contract.
+
+---
+
+###### §7.9.5 — DTOs الجديدة (Domain + Gateway boundaries — بدون تغيير مبدأ DTO boundaries)
+
+| DTO | الطبقة | الحقول |
+|---|---|---|
+| `PaymentInstructionData` | Domain (خرج `PaymentInstructionService`) | `paymentId`, `provider`, `merchantAccount`, `amount`, `currency`, `expiresAt`, `instructions` |
+| `VerifyTransactionData` | Domain (دخل `PaymentVerificationService`) | `paymentId`, `transactionNumber` |
+| `VerifyTransactionRequest` | Gateway (دخل `PaymentGateway::verifyTransaction()`) | `transactionNumber`, `expectedAmount`, `expectedCurrency`, `merchantAccount` |
+| `VerifyTransactionResponse` | Gateway (خرج `PaymentGateway::verifyTransaction()`) | `found`, `amount`, `currency`, `receiverAccount`, `providerTransactionId`, `rawStatus` |
+| `TransactionVerificationResult` | Domain (خرج `PaymentGatewayService::verifyTransaction()` بعد mapping) | `matched: bool`, `reason: ?string` (enum سبب الرفض عند `matched=false`)، `providerTransactionId` |
+
+**لا** تُدمَج هذه الحقول في نموذج واحد "God DTO" — كل DTO حدود طبقة واحدة (بدون تغيير عن مبدأ DTO boundaries المقفل).
+
+---
+
+###### §7.9.6 — Verification Rules (مقفلة — Business Rules)
+
+الدفعة تُعتبر صحيحة **فقط** إذا تحققت **جميع** الشروط التالية معًا:
+
+| # | الشرط |
+|---|---|
+| 1 | Transaction موجودة فعليًا عند API Syria (`find_tx` يعيد نتيجة، `found = true`) |
+| 2 | `amount` في الاستجابة == `expected_amount` للـ `PaymentTransaction` (مطابقة تامة، لا هامش تسامح إلا إن وثّقه API Syria) |
+| 3 | `currency` في الاستجابة == عملة `PaymentTransaction` |
+| 4 | `receiverAccount` في الاستجابة == `merchant_account` المُهيَّأ للنظام (config — بدون hardcode) |
+| 5 | `transaction_number` **فريد على مستوى المنصة بالكامل** — لم يُستخدم من قبل لأي `PaymentTransaction` آخر، بأي حالة (انظر §7.9.6.1) |
+| 6 | `PaymentTransaction` الحالية بحالة `awaiting_transfer` أو `verifying` وقت التحقق (**ليست** `paid`/`failed`/`expired`؛ إن كانت `expired` → رفض فوري بدون استدعاء Gateway) |
+
+**فشل أي شرط ⇒** `TransactionVerificationResult.matched = false` مع `reason` واضح (enum: `not_found`, `amount_mismatch`, `currency_mismatch`, `receiver_mismatch`, `duplicate_transaction_number`, `not_awaiting_transfer`, `expired`) → `PaymentVerificationService` يستدعي `PaymentService::markVerificationFailed()`/`expirePayment()` (بدون تغيير حالة إن كانت `paid`/`failed`/`expired` مسبقًا — قراءة فقط).
+
+---
+
+###### §7.9.6.1 — Global Transaction Number Uniqueness (متطلب معماري إضافي — مقفل)
+
+**القاعدة:** `transaction_number` يجب أن يكون **فريدًا على مستوى المنصة بالكامل** (عبر كل الفعاليات/المنشآت/الطلبات) — **بمجرد** ربط رقم عملية بنجاح بدفعة واحدة (`paid`)، **يُمنع نهائيًا** قبوله لأي دفعة أخرى، إلى الأبد. هذا **متطلب أمان لمنع الاحتيال** (استخدام نفس التحويل المصرفي/المحفظة للمطالبة بأكثر من طلب) — **ليس** مجرد idempotency key تقني.
+
+**التطبيق على طبقتين إلزاميتين معًا (Defense in Depth):**
+
+| الطبقة | الآلية | التفصيل |
+|---|---|---|
+| **Database (SSOT النهائي)** | `UNIQUE` index على عمود `payment_transactions.transaction_number` (nullable-safe — قيم `NULL` متعددة مسموحة، القيم غير-`NULL` فريدة إلزاميًا) | يضمن عدم إمكانية وجود صفّين بنفس `transaction_number` **حتى تحت تزامن/race condition** — هذا هو الضمان الحقيقي، وليس تطبيق الطبقة التالية |
+| **Application (UX + fail-fast)** | `PaymentVerificationService` يفحص عبر استعلام (`WHERE transaction_number = ? AND id != ?`) **قبل** استدعاء Gateway، ويرفض فورًا بـ `reason = duplicate_transaction_number` دون أي طلب HTTP خارجي | يمنع استدعاءات Gateway غير الضرورية، ويُعيد خطأ عمل واضح (409/422) بدل ترك `QueryException` خام يتسرب من طبقة الـ DB |
+
+**قاعدة التعامل مع التزامن (race condition):** إن نجح الفحص التطبيقي لكنّ إدراج/تحديث `transaction_number` فشل لاحقًا بسبب `QueryException` (انتهاك UNIQUE، بسبب طلب مُتزامن آخر أسرع)، تُعامَل كـ `duplicate_transaction_number` (نفس معالجة الفحص التطبيقي) — **لا** تتسرب `QueryException` خام إلى الـ Controller. **نفس نمط** `PaymentService::initiatePayment()` الحالي (يمسك `QueryException` على `UNIQUE(provider, provider_transaction_id)`، §7.1).
+
+**لا استثناء:** لا فرق بين `transaction_number` تابع لدفعة `paid` أو `failed` أو `expired` أو `verifying` أو `awaiting_transfer` — الفريدة **مطلقة** على مستوى العمود بالكامل، بلا شرط "فقط بعد النجاح". هذا أكثر تحفظًا (وأكثر أمانًا) من "يُمنع فقط بعد الربط الناجح" المطلوب صراحةً، ولا يتعارض معه.
+
+**قاعدة Idempotency الجديدة (تُحدِّث §7.3.1 لمسار الدفع):**
+
+| Operation | Idempotency Key | Rule |
+|---|---|---|
+| `PaymentInstructionService.createInstructions()` | `(order_id, provider)` | **بدون تغيير عن §7.3.1** — عملية `awaiting_transfer` واحدة فعالة لكل (order, provider) |
+| `PaymentVerificationService.verify()` | `transaction_number` (global UNIQUE عبر كل `payment_transactions`) | رقم عملية واحد لا يمكن استخدامه لأكثر من دفعة واحدة — يستبدل `(provider, provider_event_id)` UNIQUE الخاص بـ webhooks |
+
+---
+
+###### §7.9.7 — Payment States (يُوسِّع `PaymentTransactionStatus` — **إضافة، لا استبدال**، per قرار §7.9.2/§7.9.10: الكود القديم يبقى dormant وعامل)
+
+**الحالي (`app/Enums/FinancialDomain/PaymentTransactionStatus.php`):** `pending`, `completed`, `failed`, `refunded` — **تبقى بدون حذف** (يستخدمها مسار hosted-checkout الخامل + اختباراته الحالية، والتي يجب أن تبقى خضراء).
+
+**الجديد (يُضاف إلى نفس الـ enum):**
+
+```php
+enum PaymentTransactionStatus: string
+{
+    // Legacy (hosted checkout — dormant، بدون حذف، §7.9.2)
+    case Pending = 'pending';
+    case Completed = 'completed';
+    case Failed = 'failed';
+    case Refunded = 'refunded';
+
+    // Manual Wallet Transfer (Batch 7.6+ — المسار الفعلي الحالي)
+    case AwaitingTransfer = 'awaiting_transfer';
+    case Verifying = 'verifying';
+    case Paid = 'paid';
+    case Expired = 'expired';
+}
+```
+
+**سبب الإبقاء على `Failed` مشتركًا بين المسارين:** المعنى مطابق (فشل نهائي) في كل من hosted-checkout والـ Manual Transfer — لا حاجة لقيمة مكررة. `PaymentTransactionStateMachine` يُحدَّث بمسارين مستقلين لكل enum family (لا تقاطع انتقالات بين legacy states والحالات الجديدة).
+
+**Migration:** إضافة القيم الجديدة إلى عمود MySQL `ENUM` الحالي عبر `ALTER TABLE ... MODIFY COLUMN` (نفس نمط `2026_07_08_180000_expand_webhook_log_statuses.php`) — **لا** migration جديدة تُنشئ عمودًا آخر، **لا** كسر للبيانات القديمة أو الاختبارات الحالية.
+
+**State Machine (الجديد — مسار مستقل تمامًا عن legacy):**
+
+```
+awaiting_transfer → verifying → paid
+awaiting_transfer → verifying → failed → (retry يُعيد الحالة إلى verifying أو يبقى awaiting_transfer حتى محاولة تحقق جديدة)
+awaiting_transfer → expired                              [عبر scheduled job — خارج نطاق Batch 7.6، يُطرح لاحقًا إن لزم]
+```
+
+**قرار نهائي:** لا حاجة لحالة `refunded` جديدة — الاسترداد يبقى عبر `refunds.status` المستقل تمامًا (بدون تغيير — Refund flow خارج النطاق §7.9.2)؛ `PaymentTransaction.status = paid` يبقى كما هو حتى بعد استرداد مرتبط به.
+
+**تأثير على `PaymentService`:** **لا** تعديل على الدوال الحالية (`initiatePayment`/`completePayment`/`failPayment`) التي تخدم legacy hosted-checkout — تبقى كما هي وتُستخدَم فقط من الكود الخامل/اختباراته. الدوال الجديدة لمسار Manual Transfer تُضاف بأسماء مستقلة (`PaymentInstructionService`/`PaymentVerificationService` يستدعيان دوال جديدة على `PaymentService`، لا يُعاد استخدام الدوال القديمة بنفس التوقيع لتجنّب تشابك state machines).
+
+---
+
+###### §7.9.8 — New API Surface (يستبدل `POST /payments` الحالي في §6.6)
+
+| Endpoint | الوصف | Controller | Service |
+|---|---|---|---|
+| `POST /payments` | ينشئ `PaymentTransaction(awaiting_transfer)` ويُرجع تعليمات الدفع | `PaymentController::store()` (مُعدَّل) | `PaymentInstructionService` |
+| `POST /payments/{payment}/verify` | يستقبل `transaction_number`، يُشغّل مسار التحقق الكامل | `PaymentController::verify()` (جديد) | `PaymentVerificationService` |
+
+**Response شكل `POST /payments` (مثال — عبر ApiResource، بدون تغيير مبدأ ApiResources):**
+
+```json
+{
+    "payment_id": "…",
+    "provider": "…",
+    "merchant_account": "…",
+    "amount": "…",
+    "currency": "…",
+    "expires_at": "…",
+    "instructions": "…"
+}
+```
+
+**Request/Response لـ `POST /payments/{payment}/verify`:**
+
+```json
+// Request
+{ "transaction_number": "…" }
+
+// Response (success)
+{ "payment_id": "…", "status": "paid", "order_id": "…" }
+
+// Response (failure)
+{ "payment_id": "…", "status": "failed", "reason": "amount_mismatch" }
+```
+
+**تأثير على المسارات الحالية:**
+
+| المسار الحالي | القرار |
+|---|---|
+| `GET /payments`, `GET /payments/{paymentTransaction}` | **بدون تغيير** — تبقى للاستعلام |
+| `POST /payments` | **يُعدَّل** — نفس الفعل، منطق داخلي مختلف (§7.9.3) |
+| `POST /payments/{paymentTransaction}/complete` | **قرار نهائي: Deprecated.** يبقى موجودًا مؤقتًا للتوافق الخلفي (backward compatibility)، **يُعلَّم صريحًا `@deprecated`** في الكود/OpenAPI؛ `POST /payments/{payment}/verify` هو **المدخل العام الوحيد** الذي يجوز له إكمال الدفع (`PaymentService::completePayment()` يُستدعى فقط من `PaymentVerificationService` في المسار الطبيعي). يُحذف فعليًا في Batch 7.9 (Cleanup) بعد الترحيل |
+| `POST /payments/{paymentTransaction}/fail` | **قرار نهائي: Deprecated** — نفس المعالجة أعلاه |
+| `POST /webhooks/{provider}`, `routes/webhooks.php` | **Dormant, not deleted** (§7.9.2) — يبقى موجودًا لكن غير مُستدعى من مسار الدفع الحالي؛ لا حذف قبل Batch 7.9 |
+
+---
+
+###### §7.9.9 — Architecture Guard Updates (`GatewayArchitectureGuardTest`)
+
+**تُضاف/تُحدَّث الحراسات التالية:**
+
+| Rule | ملاحظة |
+|---|---|
+| `PaymentGateway` contract يُصرِّح `verifyTransaction()` فقط — **لا** `initiate()` | يمنع رجوع hosted-checkout بالخطأ |
+| **فقط** `PaymentGatewayService` يستخدم `PaymentGatewayRegistry` + `PaymentGateway` contract | **بدون تغيير** عن Phase 7.1/7.4 |
+| Controllers لا تستدعي `PaymentGatewayService` مباشرة — فقط عبر `PaymentInstructionService`/`PaymentVerificationService` | جديد — يعكس §7.9.3 |
+| `PaymentInstructionService` لا يستدعي Gateway/Registry | جديد |
+| `PaymentGatewayService` لا يحتوي `if ($provider === …)` | **بدون تغيير** عن §7.4 |
+| Gateway classes لا تستورد `App\Models\*` / لا تستخدم `DB::` | **بدون تغيير** |
+| تغييرات `PaymentTransaction.status` تمر عبر `PaymentService` فقط | **بدون تغيير** |
+| `PaymentInstructionService` / `PaymentVerificationService` / `PaymentGatewayService::verifyTransaction()` **لا** يستوردون `WebhookLog`, `WebhookLogService`, `WebhookService`, `ReplayProtectionService`, `GatewaySignatureVerifier`, أو أي mapper من `WebhookDomainCommandMapperRegistry` | **جديد** — يضمن أن الكود الخامل (dormant) لا يُستدعى من مسار Manual Transfer (§7.9.2/§7.9.10) |
+| حراسات §7.2–§7.4 الخاصة بـ `WebhookService` (orchestrator-only) | **تبقى كما هي** — لا تُحذف، لأن الكود الذي تحرسه لا يزال موجودًا (dormant) وقد يُستخدَم لمزوّد مستقبلي |
+
+---
+
+###### §7.9.10 — Migration & Data Considerations (قرارات نهائية — تمت الموافقة)
+
+| # | القرار | الحسم النهائي |
+|---|---|---|
+| 1 | مصير جدول/بنية `webhook_logs` وكل Webhook infra (`WebhookController`, `WebhookService`, `WebhookLogService`, `ReplayProtectionService`, `GatewaySignatureVerifier`, mapper registry) | **Dormant, not deleted.** تبقى جزءًا من منصة الدفع العامة (مزوّدون مستقبليون قد يدعمون webhooks). **لا** كتابة/قراءة إليها من مسار Manual Transfer الجديد. حذف فعلي فقط في Batch 7.9 (Cleanup) المستقل بعد استقرار الإنتاج |
+| 2 | مصير `PaymentTransaction` الحالية بحالة `pending` (القديمة) عند النشر | خارج نطاق هذه الوثيقة (لا بيئة إنتاج فعلية بعد) — يُحدَّد عمليًا وقت الترحيل الفعلي إن لزم |
+| 3 | مصير `POST /payments/{paymentTransaction}/complete` و `/fail` | **Deprecated** — تبقى للتوافق الخلفي، تُعلَّم صريحًا، `verify` هو المدخل العام الوحيد لإكمال الدفع؛ حذف فعلي في Batch 7.9 |
+| 4 | `RefundGateway` / Refund flow | **خارج النطاق بالكامل — نهائي.** لا تعديل في أي Batch من 7.6–7.9 |
+| 5 | ملفات Legacy (`ShamCashGateway`, `SyriatelCashGateway`, Signature Verifiers, `WebhookController`, إلخ) | **لا حذف في 7.6–7.8.** تبقى معزولة وخاملة (isolated & dormant) — **لا** مسار إنتاجي جديد يعتمد عليها (مُطبَّق كـ Architecture Guard §7.9.9). الحذف الفعلي يقع في **Batch 7.9 (Cleanup)** كدفعة مستقلة، فقط بعد اكتمال واختبار 7.6–7.8 |
+
+**نطاق Batch 7.6 (الدفعة الحالية — بدء التنفيذ):** Gateway Contract Redesign + Verification DTOs + Payment States (`PaymentTransactionStatus`) + `PaymentInstructionService`/`PaymentVerificationService` (skeleton/interfaces) + Architecture Guards. **لا** ضمن هذا الـ Batch: API wiring كامل (Controllers/Routes — Batch 7.7)، E2E (Batch 7.8)، أي حذف لكود Legacy (Batch 7.9)، أي تعديل على Refund flow.
+
+---
+
+###### §7.9.11 — Exit Criteria
+
+**Batch 7.6 (الدفعة الحالية):**
+
+| # | Criterion |
+|---|---|
+| 1 | `PaymentGateway::verifyTransaction()` (contract جديد) + Gateway DTOs (`VerifyTransactionRequest`/`Response`) |
+| 2 | Domain DTOs: `PaymentInstructionData`, `VerifyTransactionData`, `TransactionVerificationResult` |
+| 3 | `PaymentTransactionStatus` الجديد (§7.9.7) + migration لعمود الحالة، دون كسر البيانات القديمة |
+| 4 | `PaymentInstructionService` (skeleton) — ينشئ `PaymentTransaction(awaiting_transfer)`، بدون أي استدعاء Gateway |
+| 5 | `PaymentVerificationService` (skeleton) — يطبّق **كل** قواعد §7.9.6 عبر استدعاء `PaymentGatewayService::verifyTransaction()` |
+| 6 | `GatewayArchitectureGuardTest` مُحدَّث وخضراء، بما فيها حراسة عدم استدعاء dormant webhook code (§7.9.9) |
+| 7 | اختبارات Unit خضراء لكل مكوّن جديد؛ **لا** تعديل/حذف لأي اختبار Legacy قائم (يبقى أخضر كما هو) |
+
+**Batch 7.7 (لاحقًا):** API wiring كامل (`PaymentController::store()`/`verify()`, Routes, Requests, Resources/OpenAPI) + Deprecation صريح لـ `complete`/`fail`.
+
+**Batch 7.8 (لاحقًا):** E2E جديد يغطي: نجاح → `paid`، رفض كل شرط من §7.9.6 على حدة، إعادة محاولة بعد فشل، رفض transaction_number مُعاد استخدامه، انتهاء الصلاحية (`expired`) يرفض بدون استدعاء Gateway، Correlation ID ساري المفعول عبر `ActivityLog`/`Outbox` لمسار `verify`.
+
+**Batch 7.9 — Cleanup (مستقل، بعد استقرار الإنتاج):** حذف فعلي للكود Legacy الخامل (§7.9.2/§7.9.10 بند 5) + حذف `complete`/`fail` endpoints + إزالة الاختبارات القديمة غير ذات الصلة (لا تعطيلها بـ `@skip` — حذف نظيف بعد التأكد من عدم الحاجة إليها).
+
+---
+
+###### §7.9.12 — محتوى Phase 7 (ملخص نهائي — يستبدل الملخص في §7.7)
+
+- Payment instructions (`PaymentInstructionService`) + Manual transfer verification (`PaymentVerificationService`) عبر `PaymentGatewayService` (ACL) → API Syria `find_tx`.
+- `payment_transactions` (عبر `PaymentService` — SSOT) بحالات `awaiting_transfer/verifying/paid/failed/expired`.
+- Refunds + `commission_adjustments` (§52) — عبر `RefundService`، **بدون تغيير**.
+- Commissions (append-only) — بدون تغيير Phase 5 rules.
+- Batch 7.1–7.5 (hosted checkout + webhooks) محفوظة كسجل تاريخي في §7.0–§7.7، غير فعّالة إنتاجيًا بعد اكتمال §7.9.
 
 ---
 
@@ -2342,7 +2689,7 @@ tests/
 - **لا تنتقل إلى Phase 5 (Services) أو Phase 6 (APIs) قبل اكتمال Phase 4** — Policies تعتمد على العلاقات. ✅ Phase 4 مكتمل.
 - **Phase 5:** التزم بـ §5.1–§5.9 (`TransactionRunner`, Aggregate Boundaries, Service Ownership + Cannot Modify, Outbox triple-write, ActivityLog/Outbox ownership, PlatformSetting, Service Architecture Guard). ✅
 - **Phase 6:** التزم بـ §6.1–§6.12 (Thin Controllers, OpenAPI projections, Architecture Guards). ✅
-- **Phase 7:** التزم بـ §7.0–§7.7 (Gateway/Webhook layer **لا DB**؛ domain state عبر PaymentService/RefundService فقط؛ Idempotency §7.3؛ GatewayArchitectureGuardTest).
+- **Phase 7:** التزم بـ §7.0–§7.9 (Gateway layer **لا DB**؛ domain state عبر PaymentService/RefundService فقط؛ GatewayArchitectureGuardTest). **تحديث:** نموذج الدفع الفعلي (initiation) أصبح Manual Wallet Transfer + Verification (§7.9) — Webhooks/hosted-checkout (§7.2–§7.5) أصبحت مرجعًا تاريخيًا لهذا المسار المحدد.
 - من Phase 5 فصاعدًا: كل domain event حرج يُسجَّل في `outbox_events` داخل نفس الـ transaction (§57).
 - لا تدمج مسار subdomain مع api_client (§53).
 - لا `version` على `orders`/`tickets`/`payment_transactions` (§58).
@@ -2387,12 +2734,16 @@ Domain & Authorization (§1.1)
   ☑ Phase 6.6 — Payment APIs
   ☑ Phase 6.7 — Platform APIs
   ☑ Phase 6.8 — OpenAPI/Swagger + Architecture Guards
-☐ Phase 7  — Payment Gateway & Webhooks (§7.0–§7.7)
-  ☑ Phase 7.1 — Gateway Abstractions (Interfaces + DTOs + Registry)
-  ☑ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)
-  ☑ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)
-  ☑ Phase 7.4 — PaymentGatewayService Orchestration
-  ☐ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest
+☐ Phase 7  — Payments (§7.0–§7.9)
+  ☑ Phase 7.1 — Gateway Abstractions (Interfaces + DTOs + Registry)          [legacy — superseded by §7.9]
+  ☑ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)           [legacy — superseded by §7.9]
+  ☑ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)      [legacy — superseded by §7.9]
+  ☑ Phase 7.4 — PaymentGatewayService Orchestration                        [legacy — superseded by §7.9]
+  ☑ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest              [legacy — superseded by §7.9]
+  ☑ Phase 7.6 — Gateway Contract Redesign (verifyTransaction) + DTOs + PaymentTransactionStatus + PaymentInstructionService/PaymentVerificationService + Architecture Guards + global transaction_number uniqueness (§7.9) ✅
+  ☐ Phase 7.7 — API Wiring: PaymentController::store()/verify() + Routes + Requests/Resources/OpenAPI + Deprecate complete/fail (§7.9)
+  ☐ Phase 7.8 — Manual Transfer E2E Integration (§7.9)
+  ☐ Phase 7.9 — Cleanup (مستقل): حذف فعلي لكود Legacy الخامل + complete/fail endpoints (§7.9) — فقط بعد استقرار 7.6–7.8
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
 ☐ Phase 9  — Production Hardening
 
