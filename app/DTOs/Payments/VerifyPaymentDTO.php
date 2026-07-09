@@ -4,11 +4,10 @@ namespace App\DTOs\Payments;
 
 use App\DTOs\BaseDTO;
 
-readonly class InitiatePaymentDTO extends BaseDTO
+readonly class VerifyPaymentDTO extends BaseDTO
 {
     public function __construct(
-        public int $orderId,
-        public string $provider,
+        public string $transactionNumber,
     ) {}
 
     /**
@@ -17,16 +16,14 @@ readonly class InitiatePaymentDTO extends BaseDTO
     public static function fromArray(array $data): self
     {
         return new self(
-            orderId: (int) $data['order_id'],
-            provider: (string) $data['provider'],
+            transactionNumber: (string) $data['transaction_number'],
         );
     }
 
     public function toArray(): array
     {
         return [
-            'order_id' => $this->orderId,
-            'provider' => $this->provider,
+            'transaction_number' => $this->transactionNumber,
         ];
     }
 }

@@ -69,6 +69,7 @@ class ControllerArchitectureGuardTest extends TestCase
         OrderController::class => ['PaymentService', 'TicketService', 'EventService'],
         PaymentController::class => [
             'OrderService', 'RefundService', 'CommissionService', 'TicketService', 'EventService', 'OrderStatus::Paid',
+            'PaymentGatewayService',
         ],
         TaxRateController::class => ['OrderService', 'PaymentService'],
         PlatformSettingController::class => ['OrderService', 'PaymentService'],

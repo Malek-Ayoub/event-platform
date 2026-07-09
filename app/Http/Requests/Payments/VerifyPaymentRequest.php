@@ -3,16 +3,13 @@
 namespace App\Http\Requests\Payments;
 
 use App\DTOs\BaseDTO;
-use App\DTOs\Payments\CompletePaymentDTO;
+use App\DTOs\Payments\VerifyPaymentDTO;
 use App\Http\Requests\Api\BaseApiRequest;
 
-class CompletePaymentRequest extends BaseApiRequest
+class VerifyPaymentRequest extends BaseApiRequest
 {
     use ResolvesRoutePaymentTransaction;
 
-    /**
-     * @deprecated Use {@see VerifyPaymentRequest} — manual transfer verification is the only supported public completion path (Batch 7.7).
-     */
     public function authorize(): bool
     {
         $payment = $this->routePaymentTransaction();
@@ -25,7 +22,7 @@ class CompletePaymentRequest extends BaseApiRequest
      */
     protected function dtoClass(): ?string
     {
-        return CompletePaymentDTO::class;
+        return VerifyPaymentDTO::class;
     }
 
     /**
@@ -34,8 +31,7 @@ class CompletePaymentRequest extends BaseApiRequest
     public function rules(): array
     {
         return [
-            'payment_method' => ['nullable', 'string', 'max:50'],
-            'payment_reference' => ['nullable', 'string', 'max:255'],
+            'transaction_number' => ['required', 'string', 'max:255'],
         ];
     }
 }

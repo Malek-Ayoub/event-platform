@@ -56,54 +56,74 @@ class PaymentApiTest extends TestCase
         return ['order' => $order, 'event' => $event];
     }
 
+    private function configureApiSyriaGateway(): void
+    {
+        config([
+            'payment_gateways.providers.apisyria.base_url' => 'https://api.syria.test',
+            'payment_gateways.providers.apisyria.api_key' => 'test-key',
+            'payment_gateways.providers.apisyria.merchant_account' => 'WALLET-001',
+            'payment_gateways.providers.apisyria.verify_transaction_path' => '/find_tx',
+        ]);
+    }
+
     #[Test]
-    public function owner_can_initiate_complete_and_show_payment(): void
+    public function owner_can_create_instructions_verify_and_show_payment(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
         ['order' => $order] = $this->createPendingOrder($venue);
 
-        config([
-            'payment_gateways.providers.shamcash.base_url' => 'https://api.shamcash.test',
-            'payment_gateways.providers.shamcash.api_key' => 'test-key',
-            'payment_gateways.providers.shamcash.initiate_path' => '/v1/payments',
-        ]);
+        $this->configureApiSyriaGateway();
 
         Http::fake([
-            'https://api.shamcash.test/v1/payments' => Http::response([
-                'transaction_id' => 'SC-TXN-API-001',
-                'status' => 'pending',
-                'redirect_url' => 'https://pay.shamcash.test/checkout/api-001',
-            ], 201),
+            'https://api.syria.test/find_tx' => Http::response([
+                'found' => true,
+                'transaction_id' => 'APISYRIA-TX-1001',
+                'amount' => '120.00',
+                'currency' => 'USD',
+                'receiver_account' => 'WALLET-001',
+                'status' => 'completed',
+            ], 200),
         ]);
 
         $initiate = $this->withToken($token)->postJson('/api/tenant/payments', [
             'order_id' => $order->id,
-            'provider' => 'shamcash',
-            'amount' => '120.00',
-            'currency' => 'USD',
+            'provider' => 'apisyria',
         ]);
 
         $initiate
             ->assertCreated()
-            ->assertJsonPath('data.status', PaymentTransactionStatus::Pending->value)
-            ->assertJsonPath('data.provider_transaction_id', 'SC-TXN-API-001')
-            ->assertJsonPath('meta.redirect_url', 'https://pay.shamcash.test/checkout/api-001');
+            ->assertJsonPath('data.provider', 'apisyria')
+            ->assertJsonPath('data.merchant_account', 'WALLET-001')
+            ->assertJsonPath('data.amount', '120.00')
+            ->assertJsonPath('data.currency', 'USD')
+            ->assertJsonStructure([
+                'data' => [
+                    'payment_id',
+                    'provider',
+                    'merchant_account',
+                    'amount',
+                    'currency',
+                    'expires_at',
+                    'instructions',
+                ],
+            ]);
 
-        $paymentId = $initiate->json('data.id');
+        $paymentId = $initiate->json('data.payment_id');
 
-        $this->withToken($token)->postJson("/api/tenant/payments/{$paymentId}/complete", [
-            'payment_method' => 'shamcash',
-            'payment_reference' => 'REF-001',
+        $this->withToken($token)->postJson("/api/tenant/payments/{$paymentId}/verify", [
+            'transaction_number' => 'TX-1001',
         ])
             ->assertOk()
-            ->assertJsonPath('data.status', PaymentTransactionStatus::Completed->value);
+            ->assertJsonPath('data.status', PaymentTransactionStatus::Paid->value)
+            ->assertJsonPath('data.transaction_number', 'TX-1001')
+            ->assertJsonPath('data.provider_transaction_id', 'APISYRIA-TX-1001');
 
         $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
 
         $this->withToken($token)->getJson("/api/tenant/payments/{$paymentId}")
             ->assertOk()
             ->assertJsonPath('data.order_id', $order->id)
-            ->assertJsonPath('data.status', PaymentTransactionStatus::Completed->value);
+            ->assertJsonPath('data.status', PaymentTransactionStatus::Paid->value);
     }
 
     #[Test]
@@ -112,9 +132,9 @@ class PaymentApiTest extends TestCase
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
         ['order' => $order] = $this->createPendingOrder($venue);
 
-        PaymentTransaction::factory()->forOrder($order)->create([
+        PaymentTransaction::factory()->forOrder($order)->awaitingTransfer()->create([
+            'provider' => 'apisyria',
             'amount' => '120.00',
-            'provider_transaction_id' => 'TXN-LIST-1',
         ]);
 
         $this->withToken($token)->getJson('/api/tenant/payments')
@@ -126,17 +146,17 @@ class PaymentApiTest extends TestCase
                 'links' => ['first', 'last', 'prev', 'next'],
             ]);
 
-        $this->withToken($token)->getJson('/api/tenant/payments?order_id='.$order->id.'&status=pending')
+        $this->withToken($token)->getJson('/api/tenant/payments?order_id='.$order->id.'&status=awaiting_transfer')
             ->assertOk()
             ->assertJsonCount(1, 'data');
 
-        $this->withToken($token)->getJson('/api/tenant/payments?status=completed')
+        $this->withToken($token)->getJson('/api/tenant/payments?status=paid')
             ->assertOk()
             ->assertJsonCount(0, 'data');
     }
 
     #[Test]
-    public function owner_can_fail_payment(): void
+    public function owner_can_fail_legacy_pending_payment(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
         ['order' => $order] = $this->createPendingOrder($venue);
@@ -156,29 +176,44 @@ class PaymentApiTest extends TestCase
     }
 
     #[Test]
-    public function initiate_payment_rejects_amount_mismatch(): void
+    public function verify_rejects_duplicate_transaction_number(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
-        ['order' => $order] = $this->createPendingOrder($venue);
+        ['order' => $firstOrder] = $this->createPendingOrder($venue);
+        ['order' => $secondOrder] = $this->createPendingOrder($venue);
 
-        config([
-            'payment_gateways.providers.shamcash.base_url' => 'https://api.shamcash.test',
-            'payment_gateways.providers.shamcash.api_key' => 'test-key',
-            'payment_gateways.providers.shamcash.initiate_path' => '/v1/payments',
-        ]);
+        $this->configureApiSyriaGateway();
 
         Http::fake([
-            'https://api.shamcash.test/v1/payments' => Http::response([
-                'transaction_id' => 'SC-TXN-BAD-AMT',
-                'status' => 'pending',
-            ], 201),
+            'https://api.syria.test/find_tx' => Http::response([
+                'found' => true,
+                'transaction_id' => 'APISYRIA-TX-DUP-001',
+                'amount' => '120.00',
+                'currency' => 'USD',
+                'receiver_account' => 'WALLET-001',
+                'status' => 'completed',
+            ], 200),
         ]);
 
-        $this->withToken($token)->postJson('/api/tenant/payments', [
-            'order_id' => $order->id,
-            'provider' => 'shamcash',
-            'amount' => '99.00',
-        ])->assertStatus(422);
+        $firstPaymentId = $this->withToken($token)->postJson('/api/tenant/payments', [
+            'order_id' => $firstOrder->id,
+            'provider' => 'apisyria',
+        ])->json('data.payment_id');
+
+        $secondPaymentId = $this->withToken($token)->postJson('/api/tenant/payments', [
+            'order_id' => $secondOrder->id,
+            'provider' => 'apisyria',
+        ])->json('data.payment_id');
+
+        $this->withToken($token)->postJson("/api/tenant/payments/{$firstPaymentId}/verify", [
+            'transaction_number' => 'TX-DUP-001',
+        ])->assertOk();
+
+        $this->withToken($token)->postJson("/api/tenant/payments/{$secondPaymentId}/verify", [
+            'transaction_number' => 'TX-DUP-001',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Transaction number [TX-DUP-001] has already been used for another payment.');
     }
 
     #[Test]
@@ -191,15 +226,14 @@ class PaymentApiTest extends TestCase
 
         $this->withToken($token)->postJson('/api/tenant/payments', [
             'order_id' => $foreignOrder->id,
-            'provider' => 'shamcash',
-            'amount' => $foreignOrder->total,
+            'provider' => 'apisyria',
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['order_id']);
     }
 
     #[Test]
-    public function complete_payment_is_idempotent(): void
+    public function complete_payment_is_idempotent_for_legacy_pending_payments(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
         ['order' => $order] = $this->createPendingOrder($venue);
@@ -231,8 +265,7 @@ class PaymentApiTest extends TestCase
 
         $this->withToken($token)->postJson('/api/tenant/payments', [
             'order_id' => $order->id,
-            'provider' => 'shamcash',
-            'amount' => '120.00',
+            'provider' => 'apisyria',
         ])->assertForbidden();
     }
 }

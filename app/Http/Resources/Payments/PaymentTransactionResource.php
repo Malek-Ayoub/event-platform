@@ -21,9 +21,11 @@ class PaymentTransactionResource extends ApiResource
             'order' => $this->whenLoaded('order', fn () => new OrderResource($this->order)),
             'provider' => $this->provider,
             'provider_transaction_id' => $this->provider_transaction_id,
+            'transaction_number' => $this->transaction_number,
             'amount' => $this->amount,
             'currency' => $this->currency,
             'status' => $this->status->value,
+            'expires_at' => $this->expires_at?->toIso8601String(),
             'payload' => $this->when(
                 $request->user()?->can('update', $this->resource) ?? false,
                 $this->payload,

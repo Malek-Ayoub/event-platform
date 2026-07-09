@@ -866,7 +866,7 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 | **7.4** | Gateway Orchestration (`PaymentGatewayService`) | 7.3 | ✅ (legacy — `initiatePayment()`/`handleWebhook()` تُستبدَل بـ `verifyTransaction()` orchestration §7.9.4) |
 | **7.5** | End-to-End Integration + `GatewayArchitectureGuardTest` | 7.1–7.4 | ✅ (legacy — يُستبدَل E2E الخاص بمسار hosted checkout بـ E2E جديد لمسار Manual Transfer، §7.9.11) |
 | **7.6** | Gateway Contract Redesign (`verifyTransaction`) + Verification DTOs + `PaymentTransactionStatus` state machine الجديدة + `PaymentInstructionService`/`PaymentVerificationService` + Architecture Guards + global `transaction_number` uniqueness (§7.9.6.1) | 7.1 (Registry/Contracts فقط) | ✅ |
-| **7.7** | API Wiring: `PaymentController::store()` مُعدَّل + `PaymentController::verify()` جديد + Routes + Requests + Resources/OpenAPI + Deprecation صريح لـ `complete`/`fail` | 7.6 | ⏳ Planned |
+| **7.7** | API Wiring: `PaymentController::store()` مُعدَّل + `PaymentController::verify()` جديد + Routes + Requests + Resources/OpenAPI + Deprecation صريح لـ `complete`/`fail` | 7.6 | ✅ Done |
 | **7.8** | Manual Transfer E2E Integration (`PaymentFlowE2ETest` الجديد لمسار Manual Transfer) | 7.6–7.7 | ⏳ Planned |
 | **7.9** *(Cleanup — batch مستقل)* | إزالة فعلية للكود Legacy الخامل (Hosted checkout gateways, signature verifiers, `WebhookController` إن قُرِّر إزالته لاحقًا) — **فقط** بعد اكتمال 7.6–7.8 واختبارها في الإنتاج | 7.6–7.8 | ⏳ Planned (لا تُنفَّذ قبل استقرار المسار الجديد) |
 
@@ -2741,7 +2741,7 @@ Domain & Authorization (§1.1)
   ☑ Phase 7.4 — PaymentGatewayService Orchestration                        [legacy — superseded by §7.9]
   ☑ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest              [legacy — superseded by §7.9]
   ☑ Phase 7.6 — Gateway Contract Redesign (verifyTransaction) + DTOs + PaymentTransactionStatus + PaymentInstructionService/PaymentVerificationService + Architecture Guards + global transaction_number uniqueness (§7.9) ✅
-  ☐ Phase 7.7 — API Wiring: PaymentController::store()/verify() + Routes + Requests/Resources/OpenAPI + Deprecate complete/fail (§7.9)
+  ☑ Phase 7.7 — API Wiring: PaymentController::store()/verify() + Routes + Requests/Resources/OpenAPI + Deprecate complete/fail (§7.9)
   ☐ Phase 7.8 — Manual Transfer E2E Integration (§7.9)
   ☐ Phase 7.9 — Cleanup (مستقل): حذف فعلي لكود Legacy الخامل + complete/fail endpoints (§7.9) — فقط بعد استقرار 7.6–7.8
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)

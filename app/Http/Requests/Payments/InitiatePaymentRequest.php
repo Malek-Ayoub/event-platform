@@ -30,9 +30,6 @@ class InitiatePaymentRequest extends BaseApiRequest
         return [
             'order_id' => ['required', 'integer', $this->tenantExists('orders')],
             'provider' => ['required', 'string', 'max:50'],
-            'amount' => ['sometimes', 'numeric', 'min:0'],
-            'currency' => ['sometimes', 'string', 'size:3'],
-            'metadata' => ['nullable', 'array'],
         ];
     }
 }

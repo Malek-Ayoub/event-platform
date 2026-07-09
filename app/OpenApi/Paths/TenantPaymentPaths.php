@@ -16,7 +16,16 @@ final class TenantPaymentPaths
         parameters: [
             new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100)),
             new OA\Parameter(name: 'order_id', in: 'query', schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'status', in: 'query', schema: new OA\Schema(type: 'string', enum: ['pending', 'completed', 'failed', 'refunded'])),
+            new OA\Parameter(name: 'status', in: 'query', schema: new OA\Schema(type: 'string', enum: [
+                'pending',
+                'completed',
+                'failed',
+                'refunded',
+                'awaiting_transfer',
+                'verifying',
+                'paid',
+                'expired',
+            ])),
         ],
         responses: [
             new OA\Response(
@@ -38,16 +47,16 @@ final class TenantPaymentPaths
     #[OA\Post(
         path: '/api/tenant/payments',
         operationId: 'tenant.payments.store',
-        summary: 'Initiate payment',
+        summary: 'Create payment instructions for manual wallet transfer',
         tags: ['Payments'],
         security: [['sanctum' => []]],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/InitiatePaymentRequest')),
         responses: [
             new OA\Response(
                 response: 201,
-                description: 'Payment initiated',
+                description: 'Payment instructions created',
                 content: new OA\JsonContent(
-                    properties: [new OA\Property(property: 'data', ref: '#/components/schemas/PaymentTransactionResource')],
+                    properties: [new OA\Property(property: 'data', ref: '#/components/schemas/PaymentInstructionResource')],
                     type: 'object',
                 ),
             ),
@@ -77,9 +86,32 @@ final class TenantPaymentPaths
     public function show(): void {}
 
     #[OA\Post(
+        path: '/api/tenant/payments/{paymentTransaction}/verify',
+        operationId: 'tenant.payments.verify',
+        summary: 'Verify manual wallet transfer by transaction number',
+        tags: ['Payments'],
+        security: [['sanctum' => []]],
+        parameters: [new OA\Parameter(name: 'paymentTransaction', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/VerifyPaymentRequest')),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Payment verification result',
+                content: new OA\JsonContent(
+                    properties: [new OA\Property(property: 'data', ref: '#/components/schemas/PaymentTransactionResource')],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: 422, description: 'Validation, duplicate transaction number, or verification failure', content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
+    public function verify(): void {}
+
+    #[OA\Post(
         path: '/api/tenant/payments/{paymentTransaction}/complete',
         operationId: 'tenant.payments.complete',
-        summary: 'Complete payment',
+        summary: 'Complete payment (deprecated — use verify)',
+        deprecated: true,
         tags: ['Payments'],
         security: [['sanctum' => []]],
         parameters: [new OA\Parameter(name: 'paymentTransaction', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
@@ -109,7 +141,8 @@ final class TenantPaymentPaths
     #[OA\Post(
         path: '/api/tenant/payments/{paymentTransaction}/fail',
         operationId: 'tenant.payments.fail',
-        summary: 'Mark payment as failed',
+        summary: 'Mark payment as failed (deprecated — use verify)',
+        deprecated: true,
         tags: ['Payments'],
         security: [['sanctum' => []]],
         parameters: [new OA\Parameter(name: 'paymentTransaction', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],

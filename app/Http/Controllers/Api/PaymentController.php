@@ -7,16 +7,20 @@ use App\Http\Requests\Payments\FailPaymentRequest;
 use App\Http\Requests\Payments\InitiatePaymentRequest;
 use App\Http\Requests\Payments\ListPaymentsRequest;
 use App\Http\Requests\Payments\ShowPaymentRequest;
+use App\Http\Requests\Payments\VerifyPaymentRequest;
+use App\Http\Resources\Payments\PaymentInstructionResource;
 use App\Http\Resources\Payments\PaymentTransactionResource;
-use App\Services\Payments\PaymentGatewayService;
+use App\Services\Payments\PaymentInstructionService;
 use App\Services\Payments\PaymentService;
+use App\Services\Payments\PaymentVerificationService;
 use App\Support\Http\Payments\PaymentRequestMapper;
 use Illuminate\Http\JsonResponse;
 
 class PaymentController extends BaseApiController
 {
     public function __construct(
-        private readonly PaymentGatewayService $paymentGatewayService,
+        private readonly PaymentInstructionService $paymentInstructionService,
+        private readonly PaymentVerificationService $paymentVerificationService,
         private readonly PaymentService $paymentService,
     ) {}
 
@@ -36,18 +40,11 @@ class PaymentController extends BaseApiController
 
     public function store(InitiatePaymentRequest $request): JsonResponse
     {
-        $result = $this->paymentGatewayService->initiatePayment(
-            PaymentRequestMapper::toGatewayInitiatePaymentData($request->toDto(), $request->user(), $request->ip()),
+        $instructions = $this->paymentInstructionService->createInstructions(
+            PaymentRequestMapper::toCreatePaymentInstructionsData($request->toDto(), $request->user(), $request->ip()),
         );
 
-        return (new PaymentTransactionResource($result->payment))
-            ->additional([
-                'meta' => array_filter([
-                    'redirect_url' => $result->redirectUrl,
-                ]),
-            ])
-            ->response()
-            ->setStatusCode(201);
+        return $this->respondCreated(new PaymentInstructionResource($instructions));
     }
 
     public function show(ShowPaymentRequest $request): JsonResponse
@@ -57,6 +54,9 @@ class PaymentController extends BaseApiController
         return $this->respondResource(new PaymentTransactionResource($payment));
     }
 
+    /**
+     * @deprecated Use {@see verify()} — manual transfer verification is the only supported public completion path (Batch 7.7).
+     */
     public function complete(CompletePaymentRequest $request): JsonResponse
     {
         $completed = $this->paymentService->completePayment(
@@ -71,6 +71,9 @@ class PaymentController extends BaseApiController
         return $this->respondResource(new PaymentTransactionResource($completed));
     }
 
+    /**
+     * @deprecated Use {@see verify()} — manual transfer verification is the only supported public completion path (Batch 7.7).
+     */
     public function fail(FailPaymentRequest $request): JsonResponse
     {
         $failed = $this->paymentService->failPayment(
@@ -83,5 +86,19 @@ class PaymentController extends BaseApiController
         );
 
         return $this->respondResource(new PaymentTransactionResource($failed));
+    }
+
+    public function verify(VerifyPaymentRequest $request): JsonResponse
+    {
+        $payment = $this->paymentVerificationService->verify(
+            PaymentRequestMapper::toVerifyTransactionData(
+                $request->routePaymentTransaction(),
+                $request->toDto(),
+                $request->user(),
+                $request->ip(),
+            ),
+        );
+
+        return $this->respondResource(new PaymentTransactionResource($payment));
     }
 }

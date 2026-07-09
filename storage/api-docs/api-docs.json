@@ -2725,7 +2725,11 @@
                                 "pending",
                                 "completed",
                                 "failed",
-                                "refunded"
+                                "refunded",
+                                "awaiting_transfer",
+                                "verifying",
+                                "paid",
+                                "expired"
                             ]
                         }
                     }
@@ -2766,7 +2770,7 @@
                 "tags": [
                     "Payments"
                 ],
-                "summary": "Initiate payment",
+                "summary": "Create payment instructions for manual wallet transfer",
                 "operationId": "tenant.payments.store",
                 "requestBody": {
                     "required": true,
@@ -2780,13 +2784,13 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Payment initiated",
+                        "description": "Payment instructions created",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/PaymentTransactionResource"
+                                            "$ref": "#/components/schemas/PaymentInstructionResource"
                                         }
                                     },
                                     "type": "object"
@@ -2853,12 +2857,73 @@
                 ]
             }
         },
+        "/api/tenant/payments/{paymentTransaction}/verify": {
+            "post": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Verify manual wallet transfer by transaction number",
+                "operationId": "tenant.payments.verify",
+                "parameters": [
+                    {
+                        "name": "paymentTransaction",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerifyPaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Payment verification result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaymentTransactionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation, duplicate transaction number, or verification failure",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/tenant/payments/{paymentTransaction}/complete": {
             "post": {
                 "tags": [
                     "Payments"
                 ],
-                "summary": "Complete payment",
+                "summary": "Complete payment (deprecated — use verify)",
                 "operationId": "tenant.payments.complete",
                 "parameters": [
                     {
@@ -2918,6 +2983,7 @@
                         }
                     }
                 },
+                "deprecated": true,
                 "security": [
                     {
                         "sanctum": []
@@ -2930,7 +2996,7 @@
                 "tags": [
                     "Payments"
                 ],
-                "summary": "Mark payment as failed",
+                "summary": "Mark payment as failed (deprecated — use verify)",
                 "operationId": "tenant.payments.fail",
                 "parameters": [
                     {
@@ -2959,6 +3025,7 @@
                         }
                     }
                 },
+                "deprecated": true,
                 "security": [
                     {
                         "sanctum": []
@@ -3770,25 +3837,8 @@
                     },
                     "provider": {
                         "type": "string",
-                        "example": "shamcash",
+                        "example": "apisyria",
                         "maxLength": 50
-                    },
-                    "amount": {
-                        "type": "number",
-                        "example": 150,
-                        "nullable": true,
-                        "minimum": 0
-                    },
-                    "currency": {
-                        "type": "string",
-                        "example": "USD",
-                        "nullable": true,
-                        "maxLength": 3,
-                        "minLength": 3
-                    },
-                    "metadata": {
-                        "type": "object",
-                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -3851,6 +3901,20 @@
                         "type": "string",
                         "nullable": true,
                         "maxLength": 50
+                    }
+                },
+                "type": "object"
+            },
+            "VerifyPaymentRequest": {
+                "required": [
+                    "transaction_number"
+                ],
+                "properties": {
+                    "transaction_number": {
+                        "description": "Projection of `App\\Http\\Requests\\Payments\\VerifyPaymentRequest`.",
+                        "type": "string",
+                        "example": "TX-1001",
+                        "maxLength": 255
                     }
                 },
                 "type": "object"
@@ -4164,6 +4228,39 @@
                 },
                 "type": "object"
             },
+            "PaymentInstructionResource": {
+                "properties": {
+                    "payment_id": {
+                        "description": "Projection of `App\\Http\\Resources\\Payments\\PaymentInstructionResource`.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "provider": {
+                        "type": "string",
+                        "example": "apisyria"
+                    },
+                    "merchant_account": {
+                        "type": "string",
+                        "example": "WALLET-001"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "example": "120.00"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "USD"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "instructions": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "PaymentTransactionResource": {
                 "properties": {
                     "id": {
@@ -4177,11 +4274,17 @@
                     },
                     "provider": {
                         "type": "string",
-                        "example": "shamcash"
+                        "example": "apisyria"
                     },
                     "provider_transaction_id": {
                         "type": "string",
-                        "example": "TXN-12345"
+                        "example": "APISYRIA-TX-1001",
+                        "nullable": true
+                    },
+                    "transaction_number": {
+                        "type": "string",
+                        "example": "TX-1001",
+                        "nullable": true
                     },
                     "amount": {
                         "type": "string",
@@ -4197,8 +4300,17 @@
                             "pending",
                             "completed",
                             "failed",
-                            "refunded"
+                            "refunded",
+                            "awaiting_transfer",
+                            "verifying",
+                            "paid",
+                            "expired"
                         ]
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
                     },
                     "payload": {
                         "description": "Visible only to users with orders.manage permission.",

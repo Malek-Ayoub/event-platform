@@ -10,6 +10,9 @@ class FailPaymentRequest extends BaseApiRequest
 {
     use ResolvesRoutePaymentTransaction;
 
+    /**
+     * @deprecated Use {@see VerifyPaymentRequest} — manual transfer verification is the only supported public completion path (Batch 7.7).
+     */
     public function authorize(): bool
     {
         $payment = $this->routePaymentTransaction();
