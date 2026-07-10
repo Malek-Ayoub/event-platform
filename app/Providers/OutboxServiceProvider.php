@@ -6,6 +6,7 @@ use App\Repositories\ConsumerReceiptRepository;
 use App\Repositories\OutboxRepository;
 use App\Services\Outbox\Consumers\RecordCommissionAdjustmentOnRefundProcessedConsumer;
 use App\Services\Outbox\Consumers\RecordCommissionOnOrderPaidConsumer;
+use App\Services\Outbox\Consumers\SendOrderPaidEmailConsumer;
 use App\Services\Outbox\OutboxConsumerRegistry;
 use App\Services\Outbox\OutboxDispatcher;
 use App\Services\Outbox\OutboxTenantScope;
@@ -22,6 +23,7 @@ class OutboxServiceProvider extends ServiceProvider
         $this->app->singleton(OutboxConsumerRegistry::class, function ($app): OutboxConsumerRegistry {
             $registry = new OutboxConsumerRegistry;
             $registry->register($app->make(RecordCommissionOnOrderPaidConsumer::class));
+            $registry->register($app->make(SendOrderPaidEmailConsumer::class));
             $registry->register($app->make(RecordCommissionAdjustmentOnRefundProcessedConsumer::class));
 
             return $registry;

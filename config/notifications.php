@@ -12,6 +12,10 @@ return [
         'email',
     ],
 
+    'placeholders' => [
+        'ticket_download_url' => '#pending-tickets/{{order_number}}',
+    ],
+
     /*
     | Platform-default template fallbacks when no DB template exists.
     | Venue-specific rows in email_templates override these slugs.
@@ -39,6 +43,7 @@ TEXT,
                 'order_number',
                 'ticket_count',
                 'total',
+                'amount',
                 'ticket_download_url',
             ],
         ],
