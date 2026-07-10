@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services\Orders;
 
 use App\Services\ActivityLogService;
+use App\Services\Orders\IssueTicketsService;
 use App\Services\Orders\OrderService;
 use App\Services\Orders\TicketSerialService;
 use App\Services\Orders\TicketService;
@@ -17,6 +18,7 @@ class OrderServiceArchitectureTest extends TestCase
     /** @var list<class-string> */
     private array $orderDomainServices = [
         OrderService::class,
+        IssueTicketsService::class,
         TicketService::class,
         TicketSerialService::class,
     ];

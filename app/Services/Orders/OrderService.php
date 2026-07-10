@@ -6,6 +6,7 @@ use App\Enums\OrdersDomain\OrderStatus;
 use App\Exceptions\Orders\ReservationAlreadyLinkedException;
 use App\Models\Event;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Reservation;
 use App\Models\TicketType;
 use App\Services\ActivityLogService;
@@ -75,7 +76,8 @@ class OrderService
                 'customer_phone' => $data->customerPhone,
             ]);
 
-            $this->ticketService->createForOrder($order, $event, $resolvedLineItems);
+            $this->persistOrderItems($order, $resolvedLineItems);
+            $this->ticketService->reserveInventoryForOrder($order, $event, $resolvedLineItems);
 
             if ($data->reservationId !== null) {
                 $this->linkReservation($order, $data->reservationId);
@@ -107,8 +109,24 @@ class OrderService
                 ],
             );
 
-            return $order->fresh(['tickets']);
+            return $order->fresh(['orderItems']);
         });
+    }
+
+    /**
+     * @param  list<ResolvedOrderLineItemData>  $lineItems
+     */
+    private function persistOrderItems(Order $order, array $lineItems): void
+    {
+        foreach ($lineItems as $lineItem) {
+            OrderItem::query()->create([
+                'venue_id' => $order->venue_id,
+                'order_id' => $order->id,
+                'ticket_type_id' => $lineItem->ticketType->id,
+                'quantity' => $lineItem->quantity,
+                'unit_price' => $lineItem->unitPrice,
+            ]);
+        }
     }
 
     /**

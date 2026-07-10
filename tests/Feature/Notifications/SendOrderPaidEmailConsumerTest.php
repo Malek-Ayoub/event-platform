@@ -187,6 +187,9 @@ class SendOrderPaidEmailConsumerTest extends TestCase
         $this->assertTrue(
             app(ConsumerReceiptRepository::class)->hasProcessed($outbox->id, 'commission.order_paid'),
         );
+        $this->assertTrue(
+            app(ConsumerReceiptRepository::class)->hasProcessed($outbox->id, 'tickets.issue_on_order_paid'),
+        );
     }
 
     /**

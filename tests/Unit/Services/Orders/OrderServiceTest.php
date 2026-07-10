@@ -34,7 +34,7 @@ class OrderServiceTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function it_creates_order_with_tickets_activity_log_and_outbox_event(): void
+    public function it_creates_order_with_order_items_reserved_inventory_activity_log_and_outbox_event(): void
     {
         ['venue' => $venue, 'user' => $owner] = $this->createVenueOwner();
         $this->bindTenant($venue->id);
@@ -59,9 +59,18 @@ class OrderServiceTest extends TestCase
 
         $this->assertSame('200.00', $order->subtotal);
         $this->assertSame('200.00', $order->total);
-        $this->assertCount(2, $order->tickets);
+        $this->assertCount(1, $order->orderItems);
+        $this->assertSame(2, $order->orderItems->first()->quantity);
+        $this->assertSame(0, Ticket::query()->where('order_id', $order->id)->count());
         $this->assertSame(2, $ticketType->fresh()->quantity_sold);
         $this->assertNotNull($order->payment_account_id);
+
+        $this->assertDatabaseHas('order_items', [
+            'order_id' => $order->id,
+            'ticket_type_id' => $ticketType->id,
+            'quantity' => 2,
+            'unit_price' => '100.00',
+        ]);
 
         $this->assertDatabaseHas('activity_logs', [
             'venue_id' => $venue->id,
@@ -185,7 +194,7 @@ class OrderServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_rolls_back_order_when_ticket_creation_fails(): void
+    public function it_rolls_back_order_when_inventory_reservation_fails(): void
     {
         ['venue' => $venue] = $this->createVenueOwner();
         $this->bindTenant($venue->id);

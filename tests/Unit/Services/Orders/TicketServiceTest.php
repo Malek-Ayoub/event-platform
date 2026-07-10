@@ -22,7 +22,7 @@ class TicketServiceTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function it_creates_a_single_ticket_for_an_order(): void
+    public function it_reserves_inventory_for_an_order_line_item(): void
     {
         ['venue' => $venue] = $this->createVenueOwner();
         $this->bindTenant($venue->id);
@@ -31,8 +31,28 @@ class TicketServiceTest extends TestCase
         $ticketType = TicketType::factory()->forEvent($event)->create(['price' => 50, 'quantity' => 10]);
         $order = Order::factory()->forEvent($event)->create(['status' => OrderStatus::Pending]);
 
+        app(TransactionRunner::class)->run(fn () => app(TicketService::class)->reserveInventoryForOrder(
+            $order,
+            $event,
+            [$this->resolvedLineItem($ticketType, 1)],
+        ));
+
+        $this->assertSame(1, $ticketType->fresh()->quantity_sold);
+        $this->assertSame(0, Ticket::query()->count());
+    }
+
+    #[Test]
+    public function it_issues_a_single_ticket_for_a_reserved_line_item(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $ticketType = TicketType::factory()->forEvent($event)->create(['price' => 50, 'quantity' => 10, 'quantity_sold' => 1]);
+        $order = Order::factory()->forEvent($event)->create(['status' => OrderStatus::Paid]);
+
         $runner = app(TransactionRunner::class);
-        $tickets = $runner->run(fn () => app(TicketService::class)->createForOrder(
+        $tickets = $runner->run(fn () => app(TicketService::class)->issueForOrder(
             $order,
             $event,
             [$this->resolvedLineItem($ticketType, 1)],
@@ -46,17 +66,17 @@ class TicketServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_creates_multiple_tickets_with_unique_serials(): void
+    public function it_issues_multiple_tickets_with_unique_serials(): void
     {
         ['venue' => $venue] = $this->createVenueOwner();
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
-        $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 10]);
+        $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 10, 'quantity_sold' => 3]);
         $order = Order::factory()->forEvent($event)->create();
 
         $runner = app(TransactionRunner::class);
-        $tickets = $runner->run(fn () => app(TicketService::class)->createForOrder(
+        $tickets = $runner->run(fn () => app(TicketService::class)->issueForOrder(
             $order,
             $event,
             [$this->resolvedLineItem($ticketType, 3)],
@@ -69,13 +89,13 @@ class TicketServiceTest extends TestCase
     }
 
     #[Test]
-    public function ticket_creation_failure_rolls_back_all_tickets(): void
+    public function ticket_issuance_failure_rolls_back_all_tickets(): void
     {
         ['venue' => $venue] = $this->createVenueOwner();
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
-        $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 10]);
+        $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 10, 'quantity_sold' => 2]);
         $order = Order::factory()->forEvent($event)->create();
 
         $this->mock(TicketSerialService::class, function ($mock): void {
@@ -86,7 +106,7 @@ class TicketServiceTest extends TestCase
         $runner = app(TransactionRunner::class);
 
         try {
-            $runner->run(fn () => app(TicketService::class)->createForOrder(
+            $runner->run(fn () => app(TicketService::class)->issueForOrder(
                 $order,
                 $event,
                 [$this->resolvedLineItem($ticketType, 2)],
@@ -97,11 +117,11 @@ class TicketServiceTest extends TestCase
         }
 
         $this->assertSame(0, Ticket::query()->count());
-        $this->assertSame(0, $ticketType->fresh()->quantity_sold);
+        $this->assertSame(2, $ticketType->fresh()->quantity_sold);
     }
 
     #[Test]
-    public function it_throws_when_insufficient_tickets_available(): void
+    public function it_throws_when_insufficient_tickets_available_for_reservation(): void
     {
         ['venue' => $venue] = $this->createVenueOwner();
         $this->bindTenant($venue->id);
@@ -115,7 +135,7 @@ class TicketServiceTest extends TestCase
 
         $this->expectException(InsufficientTicketsException::class);
 
-        app(TransactionRunner::class)->run(fn () => app(TicketService::class)->createForOrder(
+        app(TransactionRunner::class)->run(fn () => app(TicketService::class)->reserveInventoryForOrder(
             $order,
             $event,
             [$this->resolvedLineItem($ticketType, 2)],

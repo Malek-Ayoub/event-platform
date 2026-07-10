@@ -17,27 +17,71 @@ class TicketService
     ) {}
 
     /**
+     * Reserves inventory when an order is created (before payment).
+     *
+     * @param  list<ResolvedOrderLineItemData>  $lineItems
+     */
+    public function reserveInventoryForOrder(Order $order, Event $event, array $lineItems): void
+    {
+        foreach ($lineItems as $lineItem) {
+            $this->reserveInventoryForLineItem($order, $event, $lineItem);
+        }
+    }
+
+    /**
+     * Creates ticket rows for a paid order. Inventory must already be reserved.
+     *
      * @param  list<ResolvedOrderLineItemData>  $lineItems
      * @return list<Ticket>
      */
-    public function createForOrder(Order $order, Event $event, array $lineItems): array
+    public function issueForOrder(Order $order, Event $event, array $lineItems): array
     {
         $tickets = [];
 
         foreach ($lineItems as $lineItem) {
             $tickets = array_merge(
                 $tickets,
-                $this->createTicketsForLineItem($order, $event, $lineItem),
+                $this->issueTicketsForLineItem($order, $event, $lineItem),
             );
         }
 
         return $tickets;
     }
 
+    private function reserveInventoryForLineItem(
+        Order $order,
+        Event $event,
+        ResolvedOrderLineItemData $lineItem,
+    ): void {
+        if ($lineItem->quantity < 1) {
+            return;
+        }
+
+        $ticketType = $lineItem->ticketType;
+
+        if ($ticketType->event_id !== $event->id) {
+            throw InvalidTicketTypeException::forOrder($ticketType->id, (int) $order->id);
+        }
+
+        $available = $ticketType->quantity - $ticketType->quantity_sold;
+
+        if ($lineItem->quantity > $available) {
+            throw InsufficientTicketsException::forTicketType(
+                $ticketType->id,
+                $lineItem->quantity,
+                max(0, $available),
+            );
+        }
+
+        $ticketType->update([
+            'quantity_sold' => $ticketType->quantity_sold + $lineItem->quantity,
+        ]);
+    }
+
     /**
      * @return list<Ticket>
      */
-    private function createTicketsForLineItem(
+    private function issueTicketsForLineItem(
         Order $order,
         Event $event,
         ResolvedOrderLineItemData $lineItem,
@@ -50,16 +94,6 @@ class TicketService
 
         if ($ticketType->event_id !== $order->event_id) {
             throw InvalidTicketTypeException::forOrder($ticketType->id, (int) $order->id);
-        }
-
-        $available = $ticketType->quantity - $ticketType->quantity_sold;
-
-        if ($lineItem->quantity > $available) {
-            throw InsufficientTicketsException::forTicketType(
-                $ticketType->id,
-                $lineItem->quantity,
-                max(0, $available),
-            );
         }
 
         $created = [];
@@ -77,10 +111,6 @@ class TicketService
                 'status' => TicketStatus::Valid,
             ]);
         }
-
-        $ticketType->update([
-            'quantity_sold' => $ticketType->quantity_sold + $lineItem->quantity,
-        ]);
 
         return $created;
     }

@@ -66,15 +66,16 @@ class OrderApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.status', OrderStatus::Pending->value)
             ->assertJsonPath('data.subtotal', '150.00')
-            ->assertJsonPath('data.total', '150.00')
-            ->assertJsonCount(2, 'data.tickets');
+            ->assertJsonPath('data.total', '150.00');
+
+        $this->assertNull($create->json('data.tickets'));
 
         $orderId = $create->json('data.id');
 
         $this->withToken($token)->getJson("/api/tenant/orders/{$orderId}")
             ->assertOk()
             ->assertJsonPath('data.order_number', $create->json('data.order_number'))
-            ->assertJsonCount(2, 'data.tickets');
+            ->assertJsonCount(0, 'data.tickets');
 
         $this->assertDatabaseHas('orders', [
             'venue_id' => $venue->id,
