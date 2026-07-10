@@ -52,7 +52,7 @@ return new class extends Migration
             $table->foreignId('ticket_type_id')->constrained('ticket_types')->restrictOnDelete();
             $table->string('serial');
             $table->string('qr_code_path')->nullable();
-            $table->enum('status', ['valid', 'used', 'cancelled', 'refunded'])->default('valid');
+            $table->enum('status', ['issued', 'checked_in', 'cancelled', 'refunded', 'invalidated'])->default('issued');
             $table->timestamp('checked_in_at')->nullable();
             $table->foreignId('checked_in_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

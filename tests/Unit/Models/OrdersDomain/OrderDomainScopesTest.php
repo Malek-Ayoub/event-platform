@@ -41,13 +41,13 @@ class OrderDomainScopesTest extends TestCase
         $ticketType = TicketType::factory()->forEvent($event)->create();
 
         Ticket::factory()->forOrder($order)->forTicketType($ticketType)->create([
-            'status' => TicketStatus::Valid,
+            'status' => TicketStatus::Issued,
         ]);
         Ticket::factory()->forOrder($order)->forTicketType($ticketType)->create([
-            'status' => TicketStatus::Used,
+            'status' => TicketStatus::CheckedIn,
         ]);
 
-        $this->assertCount(1, Ticket::query()->valid()->get());
-        $this->assertCount(1, Ticket::query()->withStatus(TicketStatus::Used)->get());
+        $this->assertCount(1, Ticket::query()->issued()->get());
+        $this->assertCount(1, Ticket::query()->withStatus(TicketStatus::CheckedIn)->get());
     }
 }

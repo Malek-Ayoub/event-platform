@@ -43,9 +43,11 @@ class OrderDomainCastsTest extends TestCase
         $order = Order::factory()->forEvent($event)->create();
         $ticketType = TicketType::factory()->forEvent($event)->create();
         $ticket = Ticket::factory()->forOrder($order)->forTicketType($ticketType)->create([
-            'status' => TicketStatus::Valid,
+            'status' => TicketStatus::Issued,
+            'issued_at' => now(),
         ]);
 
-        $this->assertSame(TicketStatus::Valid, $ticket->status);
+        $this->assertSame(TicketStatus::Issued, $ticket->status);
+        $this->assertNotNull($ticket->issued_at);
     }
 }

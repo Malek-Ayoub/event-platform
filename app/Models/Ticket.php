@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $order_id
  * @property int $ticket_type_id
  * @property string $serial
+ * @property string $ticket_number
+ * @property string $qr_token
+ * @property \Illuminate\Support\Carbon|null $issued_at
  * @property TicketStatus $status
  */
 class Ticket extends Model
@@ -30,6 +33,9 @@ class Ticket extends Model
         'order_id',
         'ticket_type_id',
         'serial',
+        'ticket_number',
+        'qr_token',
+        'issued_at',
         'qr_code_path',
         'status',
         'checked_in_at',
@@ -44,6 +50,9 @@ class Ticket extends Model
             'order_id' => 'integer',
             'ticket_type_id' => 'integer',
             'serial' => 'string',
+            'ticket_number' => 'string',
+            'qr_token' => 'string',
+            'issued_at' => 'datetime',
             'qr_code_path' => 'string',
             'status' => TicketStatus::class,
             'checked_in_at' => 'datetime',
@@ -89,8 +98,8 @@ class Ticket extends Model
      * @param  Builder<self>  $query
      * @return Builder<self>
      */
-    public function scopeValid(Builder $query): Builder
+    public function scopeIssued(Builder $query): Builder
     {
-        return $query->where('status', TicketStatus::Valid);
+        return $query->where('status', TicketStatus::Issued);
     }
 }

@@ -4,8 +4,9 @@ namespace App\Enums\OrdersDomain;
 
 enum TicketStatus: string
 {
-    case Valid = 'valid';
-    case Used = 'used';
+    case Issued = 'issued';
+    case CheckedIn = 'checked_in';
     case Cancelled = 'cancelled';
     case Refunded = 'refunded';
+    case Invalidated = 'invalidated';
 }

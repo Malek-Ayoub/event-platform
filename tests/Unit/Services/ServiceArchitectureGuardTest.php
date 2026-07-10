@@ -5,6 +5,8 @@ namespace Tests\Unit\Services;
 use App\Services\ActivityLogService;
 use App\Services\Commissions\CommissionService;
 use App\Services\Orders\OrderService;
+use App\Services\Orders\QrTokenGenerator;
+use App\Services\Orders\TicketNumberGenerator;
 use App\Services\Orders\TicketSerialService;
 use App\Services\Orders\TicketService;
 use App\Services\OutboxService;
@@ -31,6 +33,8 @@ class ServiceArchitectureGuardTest extends TestCase
     private array $orchestratedChildServices = [
         TicketService::class,
         TicketSerialService::class,
+        TicketNumberGenerator::class,
+        QrTokenGenerator::class,
     ];
 
     /** @var list<string> */

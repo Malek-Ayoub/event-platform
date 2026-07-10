@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services\Orders;
 
 use App\Enums\OrdersDomain\OrderStatus;
+use App\Enums\OrdersDomain\TicketStatus;
 use App\Exceptions\Orders\InsufficientTicketsException;
 use App\Models\Event;
 use App\Models\Order;
@@ -61,7 +62,12 @@ class TicketServiceTest extends TestCase
         $this->assertCount(1, $tickets);
         $this->assertSame($order->id, $tickets[0]->order_id);
         $this->assertSame('000001', $tickets[0]->serial);
-        $this->assertSame('tickets/'.$event->id.'/000001.png', $tickets[0]->qr_code_path);
+        $this->assertSame(TicketStatus::Issued, $tickets[0]->status);
+        $this->assertNotNull($tickets[0]->ticket_number);
+        $this->assertNotNull($tickets[0]->qr_token);
+        $this->assertNotNull($tickets[0]->issued_at);
+        $this->assertSame('tickets/qr/'.$tickets[0]->qr_token.'.png', $tickets[0]->qr_code_path);
+        $this->assertStringStartsWith('EV', $tickets[0]->ticket_number);
         $this->assertSame(1, $ticketType->fresh()->quantity_sold);
     }
 

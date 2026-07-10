@@ -502,7 +502,7 @@ CREATE TABLE IF NOT EXISTS "tickets"(
   "ticket_type_id" integer not null,
   "serial" varchar not null,
   "qr_code_path" varchar,
-  "status" varchar check("status" in('valid', 'used', 'cancelled', 'refunded')) not null default 'valid',
+  "status" varchar check("status" in('issued', 'checked_in', 'cancelled', 'refunded', 'invalidated')) not null default 'issued',
   "checked_in_at" datetime,
   "checked_in_by" integer,
   "created_at" datetime,

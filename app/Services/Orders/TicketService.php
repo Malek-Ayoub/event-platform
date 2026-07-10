@@ -14,6 +14,8 @@ class TicketService
 {
     public function __construct(
         private TicketSerialService $ticketSerialService,
+        private TicketNumberGenerator $ticketNumberGenerator,
+        private QrTokenGenerator $qrTokenGenerator,
     ) {}
 
     /**
@@ -97,9 +99,12 @@ class TicketService
         }
 
         $created = [];
+        $issuedAt = now();
 
         for ($i = 0; $i < $lineItem->quantity; $i++) {
             $serial = $this->ticketSerialService->nextSerial($event);
+            $ticketNumber = $this->ticketNumberGenerator->nextForEvent($event);
+            $qrToken = $this->qrTokenGenerator->generate();
 
             $created[] = Ticket::query()->create([
                 'venue_id' => $order->venue_id,
@@ -107,16 +112,20 @@ class TicketService
                 'order_id' => $order->id,
                 'ticket_type_id' => $ticketType->id,
                 'serial' => $serial,
-                'qr_code_path' => $this->qrCodePath($event->id, $serial),
-                'status' => TicketStatus::Valid,
+                'ticket_number' => $ticketNumber,
+                'qr_token' => $qrToken,
+                'issued_at' => $issuedAt,
+                'qr_code_path' => $this->qrCodePath($qrToken),
+                'status' => TicketStatus::Issued,
             ]);
         }
 
         return $created;
     }
 
-    private function qrCodePath(int $eventId, string $serial): string
+    private function qrCodePath(string $qrToken): string
     {
-        return "tickets/{$eventId}/{$serial}.png";
+        // Regenerable storage artifact — qr_token is the source of truth (Phase 8.3.3).
+        return "tickets/qr/{$qrToken}.png";
     }
 }

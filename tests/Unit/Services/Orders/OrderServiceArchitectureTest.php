@@ -5,6 +5,8 @@ namespace Tests\Unit\Services\Orders;
 use App\Services\ActivityLogService;
 use App\Services\Orders\IssueTicketsService;
 use App\Services\Orders\OrderService;
+use App\Services\Orders\QrTokenGenerator;
+use App\Services\Orders\TicketNumberGenerator;
 use App\Services\Orders\TicketSerialService;
 use App\Services\Orders\TicketService;
 use App\Services\OutboxService;
@@ -21,6 +23,8 @@ class OrderServiceArchitectureTest extends TestCase
         IssueTicketsService::class,
         TicketService::class,
         TicketSerialService::class,
+        TicketNumberGenerator::class,
+        QrTokenGenerator::class,
     ];
 
     #[Test]
@@ -96,7 +100,7 @@ class OrderServiceArchitectureTest extends TestCase
     #[Test]
     public function ticket_serial_service_does_not_write_audit_or_outbox_records(): void
     {
-        foreach ([TicketSerialService::class, TicketService::class] as $serviceClass) {
+        foreach ([TicketSerialService::class, TicketService::class, TicketNumberGenerator::class, QrTokenGenerator::class] as $serviceClass) {
             $path = (new ReflectionClass($serviceClass))->getFileName();
             $this->assertIsString($path);
             $source = file_get_contents($path);

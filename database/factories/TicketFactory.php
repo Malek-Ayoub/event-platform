@@ -3,10 +3,14 @@
 namespace Database\Factories;
 
 use App\Enums\OrdersDomain\TicketStatus;
+use App\Models\Event;
 use App\Models\Order;
 use App\Models\Ticket;
 use App\Models\TicketType;
+use App\Services\Orders\QrTokenGenerator;
+use App\Services\Orders\TicketNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends Factory<Ticket>
@@ -23,9 +27,12 @@ class TicketFactory extends Factory
         return [
             'order_id' => Order::factory(),
             'ticket_type_id' => null,
-            'serial' => (string) fake()->unique()->numberBetween(100000, 999999),
-            'qr_code_path' => fake()->optional()->filePath(),
-            'status' => TicketStatus::Valid,
+            'serial' => Str::padLeft((string) fake()->unique()->numberBetween(1, 999999), 6, '0'),
+            'ticket_number' => 'TST-'.fake()->unique()->numerify('######-######'),
+            'qr_token' => app(QrTokenGenerator::class)->generate(),
+            'issued_at' => now(),
+            'qr_code_path' => null,
+            'status' => TicketStatus::Issued,
             'checked_in_at' => null,
             'checked_in_by' => null,
         ];
@@ -53,6 +60,10 @@ class TicketFactory extends Factory
                 ]);
                 $ticket->ticket_type_id = $ticketType->id;
             }
+
+            if ($ticket->qr_code_path === null && $ticket->qr_token !== null) {
+                $ticket->qr_code_path = "tickets/qr/{$ticket->qr_token}.png";
+            }
         });
     }
 
@@ -72,5 +83,21 @@ class TicketFactory extends Factory
             'event_id' => $ticketType->event_id,
             'venue_id' => $ticketType->venue_id,
         ]);
+    }
+
+    public function withGeneratedIdentity(Event $event): static
+    {
+        return $this->state(function () use ($event): array {
+            $ticketNumber = app(TicketNumberGenerator::class)->nextForEvent($event);
+            $qrToken = app(QrTokenGenerator::class)->generate();
+
+            return [
+                'ticket_number' => $ticketNumber,
+                'qr_token' => $qrToken,
+                'issued_at' => now(),
+                'qr_code_path' => "tickets/qr/{$qrToken}.png",
+                'status' => TicketStatus::Issued,
+            ];
+        });
     }
 }
