@@ -5,8 +5,12 @@ namespace App\Services\Outbox;
 use App\Contracts\Outbox\OutboxConsumer;
 use App\Models\OutboxEvent;
 
-abstract class AbstractOutboxConsumer implements OutboxConsumer, SupportsOutboxEventType
+abstract class AbstractOutboxConsumer implements OutboxConsumer
 {
+    abstract public function consumerKey(): string;
+
+    abstract protected function eventType(): string;
+
     public function supports(string $eventType): bool
     {
         return $eventType === $this->eventType();

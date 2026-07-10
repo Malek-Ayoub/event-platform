@@ -17,12 +17,17 @@ final class RecordCommissionOnOrderPaidConsumer extends AbstractOutboxConsumer
         private CommissionService $commissionService,
     ) {}
 
-    public function eventType(): string
+    public function consumerKey(): string
+    {
+        return 'commission.order_paid';
+    }
+
+    protected function eventType(): string
     {
         return 'order.paid';
     }
 
-    public function consume(OutboxEvent $event): void
+    public function handle(OutboxEvent $event): void
     {
         $payload = $this->innerPayload($event);
 

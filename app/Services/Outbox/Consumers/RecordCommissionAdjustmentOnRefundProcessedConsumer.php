@@ -17,12 +17,17 @@ final class RecordCommissionAdjustmentOnRefundProcessedConsumer extends Abstract
         private CommissionService $commissionService,
     ) {}
 
-    public function eventType(): string
+    public function consumerKey(): string
+    {
+        return 'commission.refund_processed';
+    }
+
+    protected function eventType(): string
     {
         return 'refund.processed';
     }
 
-    public function consume(OutboxEvent $event): void
+    public function handle(OutboxEvent $event): void
     {
         $payload = $this->innerPayload($event);
 

@@ -4,6 +4,7 @@ namespace Tests\Feature\Architecture;
 
 use App\Console\Commands\OutboxProcessCommand;
 use App\Jobs\ProcessOutboxEvents;
+use App\Repositories\ConsumerReceiptRepository;
 use App\Repositories\OutboxRepository;
 use App\Services\Commissions\CommissionService;
 use App\Services\Orders\OrderService;
@@ -28,10 +29,13 @@ class OutboxArchitectureGuardTest extends TestCase
     private array $forbiddenOutboxWorkerSymbols = [
         'OutboxDispatcher',
         'OutboxRepository',
+        'ConsumerReceiptRepository',
+        'OutboxConsumerReceipt',
         'OutboxConsumerRegistry',
         'App\\Contracts\\Outbox\\OutboxConsumer',
         'OutboxTenantScope',
         'ProcessOutboxEvents',
+        'outbox_consumer_receipts',
     ];
 
     #[Test]
@@ -74,6 +78,14 @@ class OutboxArchitectureGuardTest extends TestCase
                 continue;
             }
 
+            if ($class === ConsumerReceiptRepository::class) {
+                continue;
+            }
+
+            if ($class === \App\Models\OutboxConsumerReceipt::class) {
+                continue;
+            }
+
             if (str_starts_with($class, 'App\\Contracts\\Outbox\\')) {
                 continue;
             }
@@ -90,6 +102,42 @@ class OutboxArchitectureGuardTest extends TestCase
                 'OutboxRepository',
                 $source,
                 "{$class} must not reference OutboxRepository",
+            );
+        }
+    }
+
+    #[Test]
+    public function consumer_receipt_repository_is_only_referenced_from_allowed_layers(): void
+    {
+        $allowed = [
+            ConsumerReceiptRepository::class,
+            OutboxDispatcher::class,
+            \App\Providers\OutboxServiceProvider::class,
+        ];
+
+        foreach ($this->discoverPhpClassesUnder(base_path('app')) as $class) {
+            if (in_array($class, $allowed, true)) {
+                continue;
+            }
+
+            if (str_starts_with($class, 'App\\Contracts\\Outbox\\')) {
+                continue;
+            }
+
+            if ($class === \App\Models\OutboxConsumerReceipt::class) {
+                continue;
+            }
+
+            $this->assertStringNotContainsString(
+                'ConsumerReceiptRepository',
+                $this->sourceOf($class),
+                "{$class} must not reference ConsumerReceiptRepository — only OutboxDispatcher manages receipts",
+            );
+
+            $this->assertStringNotContainsString(
+                'OutboxConsumerReceipt',
+                $this->sourceOf($class),
+                "{$class} must not reference OutboxConsumerReceipt directly",
             );
         }
     }

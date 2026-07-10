@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Repositories\ConsumerReceiptRepository;
 use App\Repositories\OutboxRepository;
 use App\Services\Outbox\Consumers\RecordCommissionAdjustmentOnRefundProcessedConsumer;
 use App\Services\Outbox\Consumers\RecordCommissionOnOrderPaidConsumer;
@@ -15,6 +16,7 @@ class OutboxServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(OutboxRepository::class);
+        $this->app->singleton(ConsumerReceiptRepository::class);
         $this->app->singleton(OutboxTenantScope::class);
 
         $this->app->singleton(OutboxConsumerRegistry::class, function ($app): OutboxConsumerRegistry {

@@ -14,7 +14,6 @@ use App\Models\PaymentTransaction;
 use App\Models\Scopes\BelongsToVenueScope;
 use App\Services\Outbox\OutboxConsumerRegistry;
 use App\Services\Outbox\OutboxDispatcher;
-use App\Services\Outbox\SupportsOutboxEventType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
@@ -139,11 +138,11 @@ class OutboxDispatcherTest extends TestCase
         $this->bindTenant($venue->id);
 
         $registry = tap(new OutboxConsumerRegistry, function (OutboxConsumerRegistry $registry): void {
-            $registry->register(new class implements OutboxConsumer, SupportsOutboxEventType
+            $registry->register(new class implements OutboxConsumer
             {
-                public function eventType(): string
+                public function consumerKey(): string
                 {
-                    return 'order.paid';
+                    return 'test.order_paid';
                 }
 
                 public function supports(string $eventType): bool
@@ -151,7 +150,7 @@ class OutboxDispatcherTest extends TestCase
                     return $eventType === 'order.paid';
                 }
 
-                public function consume(OutboxEvent $event): void
+                public function handle(OutboxEvent $event): void
                 {
                     throw new RuntimeException('consumer failed');
                 }
@@ -159,6 +158,7 @@ class OutboxDispatcherTest extends TestCase
         });
 
         $this->app->forgetInstance(OutboxDispatcher::class);
+        $this->app->forgetInstance(OutboxConsumerRegistry::class);
         $this->app->instance(OutboxConsumerRegistry::class, $registry);
 
         config(['outbox.max_attempts' => 3]);
@@ -183,11 +183,11 @@ class OutboxDispatcherTest extends TestCase
         $this->bindTenant($venue->id);
 
         $registry = tap(new OutboxConsumerRegistry, function (OutboxConsumerRegistry $registry): void {
-            $registry->register(new class implements OutboxConsumer, SupportsOutboxEventType
+            $registry->register(new class implements OutboxConsumer
             {
-                public function eventType(): string
+                public function consumerKey(): string
                 {
-                    return 'order.paid';
+                    return 'test.order_paid';
                 }
 
                 public function supports(string $eventType): bool
@@ -195,7 +195,7 @@ class OutboxDispatcherTest extends TestCase
                     return $eventType === 'order.paid';
                 }
 
-                public function consume(OutboxEvent $event): void
+                public function handle(OutboxEvent $event): void
                 {
                     throw new RuntimeException('consumer failed');
                 }
@@ -203,6 +203,7 @@ class OutboxDispatcherTest extends TestCase
         });
 
         $this->app->forgetInstance(OutboxDispatcher::class);
+        $this->app->forgetInstance(OutboxConsumerRegistry::class);
         $this->app->instance(OutboxConsumerRegistry::class, $registry);
 
         config(['outbox.max_attempts' => 1]);

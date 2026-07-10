@@ -6,22 +6,26 @@ use App\Contracts\Outbox\OutboxConsumer;
 
 final class OutboxConsumerRegistry
 {
-    /** @var array<string, OutboxConsumer> */
-    private array $consumersByEventType = [];
+    /** @var list<OutboxConsumer> */
+    private array $consumers = [];
 
     public function register(OutboxConsumer $consumer): void
     {
-        if ($consumer instanceof SupportsOutboxEventType) {
-            $this->consumersByEventType[$consumer->eventType()] = $consumer;
-
-            return;
+        if ($consumer->consumerKey() === '') {
+            throw new \InvalidArgumentException('Outbox consumer must define a non-empty consumerKey().');
         }
 
-        throw new \InvalidArgumentException('Outbox consumer must implement SupportsOutboxEventType.');
+        $this->consumers[] = $consumer;
     }
 
-    public function resolve(string $eventType): ?OutboxConsumer
+    /**
+     * @return list<OutboxConsumer>
+     */
+    public function consumersFor(string $eventType): array
     {
-        return $this->consumersByEventType[$eventType] ?? null;
+        return array_values(array_filter(
+            $this->consumers,
+            fn (OutboxConsumer $consumer): bool => $consumer->supports($eventType),
+        ));
     }
 }
