@@ -8,18 +8,11 @@ readonly class GatewayProviderConfig
         public string $provider,
         public string $baseUrl,
         public string $apiKey,
-        public string $webhookSecret,
-        public string $signatureHeader,
-        public string $initiatePath,
         public string $refundPath,
         public int $connectTimeout,
         public int $requestTimeout,
         public int $retryAttempts,
         public int $retryDelayMs,
-        // Batch 7.6 — Manual Wallet Transfer (§7.9.4). Optional/defaulted so
-        // existing hosted-checkout providers (ShamCash, Syriatel Cash) are unaffected.
-        public string $merchantAccount = '',
-        public string $verifyTransactionPath = '/find_tx',
     ) {}
 
     public static function forProvider(string $provider): self
@@ -34,20 +27,21 @@ readonly class GatewayProviderConfig
         /** @var array<string, mixed> $http */
         $http = config('payment_gateways.http', []);
 
+        /** @var array<string, mixed> $timeouts */
+        $timeouts = is_array($config['timeouts'] ?? null) ? $config['timeouts'] : [];
+
+        /** @var array<string, mixed> $retry */
+        $retry = is_array($config['retry'] ?? null) ? $config['retry'] : [];
+
         return new self(
             provider: $provider,
             baseUrl: (string) ($config['base_url'] ?? ''),
             apiKey: (string) ($config['api_key'] ?? ''),
-            webhookSecret: (string) ($config['webhook_secret'] ?? ''),
-            signatureHeader: (string) ($config['signature_header'] ?? 'X-Signature'),
-            initiatePath: (string) ($config['initiate_path'] ?? '/payments'),
             refundPath: (string) ($config['refund_path'] ?? '/refunds'),
-            connectTimeout: (int) ($http['connect_timeout'] ?? 5),
-            requestTimeout: (int) ($http['request_timeout'] ?? 30),
-            retryAttempts: (int) ($http['retry_attempts'] ?? 2),
-            retryDelayMs: (int) ($http['retry_delay_ms'] ?? 250),
-            merchantAccount: (string) ($config['merchant_account'] ?? ''),
-            verifyTransactionPath: (string) ($config['verify_transaction_path'] ?? '/find_tx'),
+            connectTimeout: (int) ($timeouts['connect'] ?? $http['connect_timeout'] ?? 5),
+            requestTimeout: (int) ($timeouts['request'] ?? $http['request_timeout'] ?? 30),
+            retryAttempts: (int) ($retry['attempts'] ?? $http['retry_attempts'] ?? 2),
+            retryDelayMs: (int) ($retry['delay_ms'] ?? $http['retry_delay_ms'] ?? 250),
         );
     }
 }

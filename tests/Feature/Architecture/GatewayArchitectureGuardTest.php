@@ -2,8 +2,6 @@
 
 namespace Tests\Feature\Architecture;
 
-use App\Contracts\Payments\GatewaySignatureVerifier;
-use App\Contracts\Payments\PaymentGateway;
 use App\Contracts\Payments\PaymentVerificationGateway;
 use App\Contracts\Payments\RefundGateway;
 use App\Providers\PaymentGatewayServiceProvider;
@@ -12,8 +10,6 @@ use App\Services\Orders\OrderService;
 use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
-use App\Services\Payments\Mapping\InitiatePaymentRequestMapper;
-use App\Services\Payments\Mapping\InitiatePaymentResponseMapper;
 use App\Services\Payments\Mapping\RefundRequestMapper;
 use App\Services\Payments\Mapping\VerifyTransactionRequestMapper;
 use App\Services\Payments\Mapping\VerifyTransactionResponseMapper;
@@ -22,7 +18,6 @@ use App\Services\Payments\PaymentInstructionService;
 use App\Services\Payments\PaymentService;
 use App\Services\Payments\PaymentVerificationService;
 use App\Services\Refunds\RefundService;
-use App\Services\Webhooks\WebhookService;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
@@ -37,9 +32,7 @@ class GatewayArchitectureGuardTest extends TestCase
 
     /** @var list<class-string> */
     private array $gatewayContractClasses = [
-        PaymentGateway::class,
         RefundGateway::class,
-        GatewaySignatureVerifier::class,
         PaymentVerificationGateway::class,
     ];
 
@@ -159,9 +152,7 @@ class GatewayArchitectureGuardTest extends TestCase
     {
         $forbiddenPatterns = [
             'PaymentGatewayRegistry',
-            'App\\Contracts\\Payments\\PaymentGateway',
             'App\\Contracts\\Payments\\RefundGateway',
-            'App\\Contracts\\Payments\\GatewaySignatureVerifier',
             'App\\Contracts\\Payments\\PaymentVerificationGateway',
         ];
 
@@ -176,32 +167,6 @@ class GatewayArchitectureGuardTest extends TestCase
                 );
             }
         }
-    }
-
-    #[Test]
-    public function webhook_service_is_orchestrator_only(): void
-    {
-        $source = $this->sourceOf(WebhookService::class);
-
-        foreach ([
-            'PaymentGatewayRegistry',
-            'GatewaySignatureVerifier',
-            'PaymentService',
-            'RefundService',
-            'WebhookLogService',
-            'ReplayProtectionService',
-            'App\\Contracts\\Payments\\PaymentGateway',
-            'App\\Contracts\\Payments\\RefundGateway',
-            'App\\DTOs\\Payments\\Gateway\\',
-        ] as $forbidden) {
-            $this->assertStringNotContainsString(
-                $forbidden,
-                $source,
-                "WebhookService must remain a thin orchestrator and must not reference {$forbidden}",
-            );
-        }
-
-        $this->assertStringContainsString('PaymentGatewayService', $source);
     }
 
     #[Test]
@@ -246,9 +211,7 @@ class GatewayArchitectureGuardTest extends TestCase
     public function gateway_contracts_are_only_referenced_from_allowed_layers(): void
     {
         $forbiddenPatterns = [
-            'App\\Contracts\\Payments\\PaymentGateway',
             'App\\Contracts\\Payments\\RefundGateway',
-            'App\\Contracts\\Payments\\GatewaySignatureVerifier',
             'App\\Contracts\\Payments\\PaymentVerificationGateway',
         ];
 
@@ -280,8 +243,6 @@ class GatewayArchitectureGuardTest extends TestCase
         ];
 
         foreach ([
-            InitiatePaymentRequestMapper::class,
-            InitiatePaymentResponseMapper::class,
             RefundRequestMapper::class,
         ] as $class) {
             $source = $this->sourceOf($class);
@@ -314,10 +275,8 @@ class GatewayArchitectureGuardTest extends TestCase
         foreach ([
             'PaymentGatewayRegistry',
             'PaymentGatewayService',
-            'App\\Contracts\\Payments\\PaymentGateway',
             'App\\Contracts\\Payments\\PaymentVerificationGateway',
             'App\\Contracts\\Payments\\RefundGateway',
-            'App\\Contracts\\Payments\\GatewaySignatureVerifier',
         ] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $source);
         }
@@ -334,7 +293,7 @@ class GatewayArchitectureGuardTest extends TestCase
     }
 
     #[Test]
-    public function manual_transfer_services_do_not_reference_dormant_webhook_infrastructure(): void
+    public function manual_transfer_services_do_not_reference_removed_webhook_infrastructure(): void
     {
         $forbidden = [
             'WebhookLog',
@@ -486,9 +445,7 @@ class GatewayArchitectureGuardTest extends TestCase
                 continue;
             }
 
-            if ($reflection->implementsInterface(PaymentGateway::class)
-                || $reflection->implementsInterface(RefundGateway::class)
-                || $reflection->implementsInterface(GatewaySignatureVerifier::class)
+            if ($reflection->implementsInterface(RefundGateway::class)
                 || $reflection->implementsInterface(PaymentVerificationGateway::class)) {
                 $classes[] = $class;
             }

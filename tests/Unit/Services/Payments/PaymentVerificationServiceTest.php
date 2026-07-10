@@ -5,10 +5,11 @@ namespace Tests\Unit\Services\Payments;
 use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Enums\Payments\GatewayOutcome;
-use App\Enums\Payments\VerificationFailureReason;
 use App\Exceptions\Payments\DuplicateTransactionNumberException;
 use App\Models\Event;
+use App\Models\EventPaymentAccount;
 use App\Models\Order;
+use App\Models\PaymentAccount;
 use App\Models\PaymentTransaction;
 use App\Services\Payments\Data\VerifyTransactionData;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
@@ -26,10 +27,6 @@ class PaymentVerificationServiceTest extends TestCase
     {
         parent::setUp();
 
-        config([
-            'payment_gateways.providers.apisyria.merchant_account' => 'WALLET-001',
-        ]);
-
         $this->swapVerificationGateway(new ApiSyriaVerificationGatewayStub);
     }
 
@@ -39,7 +36,10 @@ class PaymentVerificationServiceTest extends TestCase
         ['venue' => $venue, 'user' => $owner] = $this->createVenueOwner();
         $this->bindTenant($venue->id);
 
-        $payment = $this->createAwaitingPayment($venue->id, '100.00');
+        $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $account = PaymentAccount::factory()->forVenue($venue)->shamcash('WALLET-001')->create();
+        EventPaymentAccount::factory()->forEvent($event)->forPaymentAccount($account)->create();
+        $payment = $this->createAwaitingPayment($venue->id, '100.00', event: $event, paymentAccountId: $account->id);
 
         $result = app(PaymentVerificationService::class)->verify(new VerifyTransactionData(
             paymentTransactionId: $payment->id,
@@ -132,8 +132,10 @@ class PaymentVerificationServiceTest extends TestCase
         string $amount,
         ?Order $order = null,
         bool $expired = false,
+        ?int $paymentAccountId = null,
+        ?Event $event = null,
     ): PaymentTransaction {
-        $event = Event::factory()->create(['venue_id' => $venueId]);
+        $event ??= Event::factory()->create(['venue_id' => $venueId]);
         $order ??= Order::factory()->forEvent($event)->create([
             'venue_id' => $venueId,
             'total' => $amount,
@@ -141,8 +143,42 @@ class PaymentVerificationServiceTest extends TestCase
             'status' => OrderStatus::Pending,
         ]);
 
+        if ($paymentAccountId === null) {
+            $paymentAccountId = $order->payment_account_id;
+        }
+
+        if ($paymentAccountId === null) {
+            $venue = \App\Models\Venue::query()->findOrFail($venueId);
+            $account = PaymentAccount::query()->firstOrCreate(
+                [
+                    'venue_id' => $venue->id,
+                    'provider' => 'shamcash',
+                    'account_identifier' => 'WALLET-001',
+                ],
+                [
+                    'display_name' => 'Test ShamCash',
+                    'currency' => 'USD',
+                ],
+            );
+
+            EventPaymentAccount::query()->firstOrCreate(
+                [
+                    'event_id' => $event->id,
+                    'payment_account_id' => $account->id,
+                ],
+                [
+                    'is_default' => true,
+                    'is_active' => true,
+                ],
+            );
+
+            $paymentAccountId = $account->id;
+            $order->update(['payment_account_id' => $paymentAccountId]);
+        }
+
         return PaymentTransaction::factory()->forOrder($order)->awaitingTransfer()->create([
             'venue_id' => $venueId,
+            'payment_account_id' => $paymentAccountId,
             'provider' => 'apisyria',
             'amount' => $amount,
             'currency' => 'USD',
@@ -153,9 +189,7 @@ class PaymentVerificationServiceTest extends TestCase
     private function swapVerificationGateway(ApiSyriaVerificationGatewayStub $stub): void
     {
         $this->app->instance(PaymentGatewayRegistry::class, new PaymentGatewayRegistry(
-            paymentGateways: [],
             refundGateways: [],
-            signatureVerifiers: [],
             verificationGateways: [
                 $stub->provider() => $stub,
             ],

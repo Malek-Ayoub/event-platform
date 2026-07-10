@@ -14,7 +14,6 @@ use App\Models\PlatformSetting;
 use App\Models\SmsTemplate;
 use App\Models\User;
 use App\Models\Venue;
-use App\Models\WebhookLog;
 use App\Support\Concerns\BelongsToVenue;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -153,9 +152,8 @@ class InfrastructureDomainRelationshipsTest extends TestCase
     }
 
     #[Test]
-    public function webhook_log_and_platform_setting_are_not_tenant_scoped(): void
+    public function platform_setting_is_not_tenant_scoped(): void
     {
-        $this->assertFalse(in_array(BelongsToVenue::class, class_uses_recursive(WebhookLog::class), true));
         $this->assertFalse(in_array(BelongsToVenue::class, class_uses_recursive(PlatformSetting::class), true));
     }
 }

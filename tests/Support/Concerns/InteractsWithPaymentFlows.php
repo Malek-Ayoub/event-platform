@@ -2,10 +2,11 @@
 
 namespace Tests\Support\Concerns;
 
-use App\Contracts\Payments\Http\HttpClientInterface;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Models\Event;
+use App\Models\EventPaymentAccount;
 use App\Models\Order;
+use App\Models\PaymentAccount;
 use App\Models\User;
 use App\Models\Venue;
 use App\Services\Payments\Gateway\Http\Adapters\LaravelHttpClientAdapter;
@@ -24,16 +25,47 @@ trait InteractsWithPaymentFlows
         config([
             'payment_gateways.providers.apisyria.base_url' => 'https://api.syria.test',
             'payment_gateways.providers.apisyria.api_key' => 'test-key',
-            'payment_gateways.providers.apisyria.merchant_account' => 'WALLET-001',
-            'payment_gateways.providers.apisyria.verify_transaction_path' => '/find_tx',
         ]);
+    }
+
+    /**
+     * Attaches a default ShamCash wallet to an event (creates or reuses venue wallet).
+     */
+    protected function attachDefaultPaymentAccount(
+        Event $event,
+        string $accountIdentifier = 'WALLET-001',
+    ): PaymentAccount {
+        $account = PaymentAccount::query()->firstOrCreate(
+            [
+                'venue_id' => $event->venue_id,
+                'provider' => 'shamcash',
+                'account_identifier' => $accountIdentifier,
+            ],
+            [
+                'display_name' => $event->name.' ShamCash',
+                'currency' => 'USD',
+            ],
+        );
+
+        EventPaymentAccount::query()->firstOrCreate(
+            [
+                'event_id' => $event->id,
+                'payment_account_id' => $account->id,
+            ],
+            [
+                'is_default' => true,
+                'is_active' => true,
+            ],
+        );
+
+        return $account;
     }
 
     protected function resetHttpFakes(): void
     {
         Http::swap(new Factory);
 
-        $this->app->forgetInstance(HttpClientInterface::class);
+        $this->app->forgetInstance(\App\Contracts\Payments\Http\HttpClientInterface::class);
         $this->app->forgetInstance(LaravelHttpClientAdapter::class);
         $this->app->forgetInstance(PaymentGatewayRegistry::class);
         $this->app->forgetInstance(PaymentGatewayService::class);
@@ -46,28 +78,33 @@ trait InteractsWithPaymentFlows
         string $transactionNumber,
         array $overrides = [],
         int $status = 200,
+        string $merchantAccount = 'WALLET-001',
     ): void {
+        $defaults = [
+            'tran_id' => 'APISYRIA-'.$transactionNumber,
+            'currency' => 'USD',
+            'amount' => '120.00',
+            'account' => $merchantAccount,
+        ];
+
+        $found = (bool) ($overrides['found'] ?? true);
+        $transactionOverrides = array_diff_key($overrides, ['found' => true]);
+        $transaction = array_merge($defaults, $transactionOverrides);
+
         Http::fake([
-            'https://api.syria.test/find_tx' => Http::response(array_merge([
-                'found' => true,
-                'transaction_id' => 'APISYRIA-'.$transactionNumber,
-                'amount' => '120.00',
-                'currency' => 'USD',
-                'receiver_account' => 'WALLET-001',
-                'status' => 'completed',
-            ], $overrides), $status),
+            'https://api.syria.test*' => Http::response([
+                'success' => true,
+                'data' => [
+                    'found' => $found,
+                    'transaction' => $found ? $transaction : null,
+                ],
+            ], $status),
         ]);
     }
 
     protected function fakeApiSyriaFindTxNotFound(string $transactionNumber): void
     {
-        $this->fakeApiSyriaFindTx($transactionNumber, [
-            'found' => false,
-            'transaction_id' => null,
-            'amount' => null,
-            'currency' => null,
-            'receiver_account' => null,
-        ]);
+        $this->fakeApiSyriaFindTx($transactionNumber, ['found' => false]);
     }
 
     /**
@@ -86,13 +123,19 @@ trait InteractsWithPaymentFlows
     }
 
     /**
+     * Creates a pending order for payments, and ensures the event has a default
+     * payment account so OrderService / PaymentAccountResolver can resolve it.
+     *
      * @return array{order: Order, event: Event}
      */
     protected function createPendingOrderForPayments(Venue $venue, string $total = '120.00'): array
     {
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $account = $this->attachDefaultPaymentAccount($event);
+
         $order = Order::factory()->forEvent($event)->create([
             'venue_id' => $venue->id,
+            'payment_account_id' => $account->id,
             'total' => $total,
             'subtotal' => $total,
             'status' => OrderStatus::Pending,

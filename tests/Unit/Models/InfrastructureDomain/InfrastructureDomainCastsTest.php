@@ -4,7 +4,6 @@ namespace Tests\Unit\Models\InfrastructureDomain;
 
 use App\Enums\InfrastructureDomain\MediaType;
 use App\Enums\InfrastructureDomain\OutboxEventStatus;
-use App\Enums\InfrastructureDomain\WebhookLogStatus;
 use App\Models\ActivityLog;
 use App\Models\EmailTemplate;
 use App\Models\Event;
@@ -12,7 +11,6 @@ use App\Models\Media;
 use App\Models\Notification;
 use App\Models\OutboxEvent;
 use App\Models\PlatformSetting;
-use App\Models\WebhookLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -65,14 +63,6 @@ class InfrastructureDomainCastsTest extends TestCase
 
         $this->assertSame(['name'], $template->variables);
         $this->assertFalse($template->is_active);
-    }
-
-    #[Test]
-    public function webhook_log_casts_status_enum(): void
-    {
-        $log = WebhookLog::factory()->failed()->create();
-
-        $this->assertSame(WebhookLogStatus::Failed, $log->status);
     }
 
     #[Test]

@@ -20,11 +20,13 @@ readonly class PaymentInstructionData extends BaseDTO
         public string $currency,
         public Carbon $expiresAt,
         public string $instructions,
+        public ?int $paymentAccountId = null,
+        public ?string $walletProvider = null,
     ) {}
 
     public function toArray(): array
     {
-        return [
+        return array_filter([
             'payment_id' => $this->paymentId,
             'provider' => $this->provider,
             'merchant_account' => $this->merchantAccount,
@@ -32,6 +34,8 @@ readonly class PaymentInstructionData extends BaseDTO
             'currency' => $this->currency,
             'expires_at' => $this->expiresAt->toIso8601String(),
             'instructions' => $this->instructions,
-        ];
+            'payment_account_id' => $this->paymentAccountId,
+            'wallet_provider' => $this->walletProvider,
+        ], static fn ($value) => $value !== null);
     }
 }

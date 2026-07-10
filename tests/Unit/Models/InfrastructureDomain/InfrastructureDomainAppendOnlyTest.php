@@ -3,7 +3,6 @@
 namespace Tests\Unit\Models\InfrastructureDomain;
 
 use App\Models\ActivityLog;
-use App\Models\WebhookLog;
 use App\Support\Concerns\HasOptimisticLock;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Schema;
@@ -15,21 +14,18 @@ class InfrastructureDomainAppendOnlyTest extends TestCase
     /** @var list<class-string> */
     private array $appendOnlyModels = [
         ActivityLog::class,
-        WebhookLog::class,
     ];
 
     #[Test]
     public function append_only_models_disable_updated_at(): void
     {
         $this->assertNull(ActivityLog::UPDATED_AT);
-        $this->assertNull(WebhookLog::UPDATED_AT);
     }
 
     #[Test]
     public function append_only_models_have_no_updated_at_column(): void
     {
         $this->assertFalse(Schema::hasColumn('activity_logs', 'updated_at'));
-        $this->assertFalse(Schema::hasColumn('webhook_logs', 'updated_at'));
     }
 
     #[Test]

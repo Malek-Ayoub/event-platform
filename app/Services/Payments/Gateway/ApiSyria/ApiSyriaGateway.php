@@ -2,28 +2,26 @@
 
 namespace App\Services\Payments\Gateway\ApiSyria;
 
-use App\Contracts\Payments\Http\GatewayHttpResponse;
 use App\Contracts\Payments\PaymentVerificationGateway;
 use App\DTOs\Payments\Gateway\VerifyTransactionRequest;
 use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
 use App\Enums\Payments\GatewayOutcome;
-use App\Services\Payments\Gateway\Http\PaymentGatewayHttpClient;
+use App\Enums\Payments\PaymentWalletProvider;
 use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
 use App\Services\Payments\Gateway\Support\GatewayResponseMapper;
 use Throwable;
 
 /**
- * Batch 7.6 — Manual Wallet Transfer (IMPLEMENTATION_ROADMAP.md §7.9.4).
+ * Phase 7.10 — Manual Wallet Transfer via API Syria read API.
  *
- * API Syria exposes only a transaction-lookup endpoint (`find_tx`) — no
- * hosted checkout, no webhooks. This gateway performs the lookup only; all
- * business validation (amount/currency/receiver matching) happens in the ACL
- * mapper (`VerifyTransactionResponseMapper`), not here.
+ * Platform credentials come from config; merchant wallet context is supplied
+ * per request via `GatewayPaymentAccount` on `VerifyTransactionRequest`.
  */
 final class ApiSyriaGateway implements PaymentVerificationGateway
 {
     public function __construct(
-        private PaymentGatewayHttpClient $http,
+        private ApiSyriaHttpClient $http,
+        private ApiSyriaResponseParser $parser,
         private GatewayResponseMapper $mapper,
     ) {}
 
@@ -35,15 +33,22 @@ final class ApiSyriaGateway implements PaymentVerificationGateway
     public function verifyTransaction(VerifyTransactionRequest $request): VerifyTransactionResponse
     {
         $config = GatewayProviderConfig::forProvider($this->provider());
+        $paymentAccount = $request->paymentAccount;
+
+        $query = [
+            'resource' => $paymentAccount->provider->value,
+            'action' => 'find_tx',
+            'tx' => $request->transactionNumber,
+        ];
+
+        if ($paymentAccount->provider === PaymentWalletProvider::Syriatel) {
+            $query['gsm'] = $paymentAccount->accountIdentifier;
+        } else {
+            $query['account_address'] = $paymentAccount->accountIdentifier;
+        }
 
         try {
-            $response = $this->http->post(
-                config: $config,
-                path: $config->verifyTransactionPath,
-                payload: [
-                    'transaction_number' => $request->transactionNumber,
-                ],
-            );
+            $response = $this->http->get($config, $query);
         } catch (Throwable $exception) {
             return $this->mapper->verifyTransactionTransportFailure(
                 outcome: $this->mapper->classifyTransportException($exception),
@@ -51,11 +56,16 @@ final class ApiSyriaGateway implements PaymentVerificationGateway
             );
         }
 
-        return $this->mapResponse($response);
+        return $this->mapResponse(
+            response: $response,
+            paymentAccount: $paymentAccount,
+        );
     }
 
-    private function mapResponse(GatewayHttpResponse $response): VerifyTransactionResponse
-    {
+    private function mapResponse(
+        \App\Contracts\Payments\Http\GatewayHttpResponse $response,
+        \App\DTOs\Payments\Gateway\GatewayPaymentAccount $paymentAccount,
+    ): VerifyTransactionResponse {
         $bodyArray = $response->body;
 
         if ($bodyArray === null) {
@@ -69,23 +79,29 @@ final class ApiSyriaGateway implements PaymentVerificationGateway
         if (! $response->successful()) {
             return $this->mapper->verifyTransactionTransportFailure(
                 outcome: $this->mapper->classifyHttpResponse($response, $bodyArray),
-                errorMessage: (string) ($bodyArray['message'] ?? $bodyArray['error'] ?? 'API Syria rejected the lookup request'),
+                errorMessage: (string) ($bodyArray['error'] ?? $bodyArray['message'] ?? 'API Syria rejected the lookup request'),
                 httpStatus: $response->status,
             );
         }
 
-        $found = (bool) ($bodyArray['found'] ?? ($bodyArray['transaction_id'] ?? $bodyArray['id'] ?? null) !== null);
+        if (($bodyArray['success'] ?? true) === false) {
+            return $this->mapper->verifyTransactionTransportFailure(
+                outcome: GatewayOutcome::Declined,
+                errorMessage: (string) ($bodyArray['error'] ?? 'API Syria reported success=false'),
+                httpStatus: $response->status,
+            );
+        }
+
+        $parsed = $this->parser->parseFindTxResponse($bodyArray, $paymentAccount);
 
         return $this->mapper->verifyTransactionResult(
-            found: $found,
-            amount: isset($bodyArray['amount']) ? (string) $bodyArray['amount'] : null,
-            currency: isset($bodyArray['currency']) ? (string) $bodyArray['currency'] : null,
-            receiverAccount: isset($bodyArray['receiver_account']) ? (string) $bodyArray['receiver_account'] : null,
-            providerTransactionId: isset($bodyArray['transaction_id'])
-                ? (string) $bodyArray['transaction_id']
-                : (isset($bodyArray['id']) ? (string) $bodyArray['id'] : null),
-            rawStatus: isset($bodyArray['status']) ? (string) $bodyArray['status'] : null,
-            raw: $bodyArray,
+            found: $parsed['found'],
+            amount: $parsed['amount'],
+            currency: $parsed['currency'],
+            receiverAccount: $parsed['receiverAccount'],
+            providerTransactionId: $parsed['providerTransactionId'],
+            rawStatus: $parsed['rawStatus'],
+            raw: $parsed['raw'],
         );
     }
 }

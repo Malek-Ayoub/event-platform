@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments\Mapping;
 
+use App\DTOs\Payments\Gateway\GatewayPaymentAccount;
 use App\DTOs\Payments\Gateway\VerifyTransactionRequest;
 
 /**
@@ -13,13 +14,13 @@ final class VerifyTransactionRequestMapper
         string $transactionNumber,
         string $expectedAmount,
         string $expectedCurrency,
-        string $merchantAccount,
+        GatewayPaymentAccount $paymentAccount,
     ): VerifyTransactionRequest {
         return new VerifyTransactionRequest(
             transactionNumber: $transactionNumber,
             expectedAmount: $expectedAmount,
             expectedCurrency: $expectedCurrency,
-            merchantAccount: $merchantAccount,
+            paymentAccount: $paymentAccount,
         );
     }
 }

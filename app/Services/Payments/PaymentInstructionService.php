@@ -9,7 +9,7 @@ use App\Services\Payments\Data\CreateAwaitingTransferData;
 use App\Services\Payments\Data\CreatePaymentInstructionsData;
 use App\Services\Payments\Data\ExpirePaymentData;
 use App\Services\Payments\Data\PaymentInstructionData;
-use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
+use App\Services\Payments\Mapping\GatewayPaymentAccountMapper;
 use Illuminate\Support\Carbon;
 
 /**
@@ -20,12 +20,15 @@ final class PaymentInstructionService
 {
     public function __construct(
         private PaymentService $paymentService,
+        private PaymentAccountResolver $paymentAccountResolver,
+        private GatewayPaymentAccountMapper $paymentAccountMapper,
     ) {}
 
     public function createInstructions(CreatePaymentInstructionsData $data): PaymentInstructionData
     {
         $provider = strtolower(trim($data->provider));
-        $config = GatewayProviderConfig::forProvider($provider);
+
+        $order = Order::query()->whereKey($data->orderId)->firstOrFail();
 
         $existing = PaymentTransaction::query()
             ->where('order_id', $data->orderId)
@@ -34,8 +37,16 @@ final class PaymentInstructionService
             ->first();
 
         if ($existing !== null && $this->isActiveInstruction($existing)) {
-            return $this->toInstructionData($existing, $config->merchantAccount);
+            $paymentAccount = $this->paymentAccountResolver->resolveForPayment($existing);
+
+            return $this->toInstructionData(
+                $existing,
+                $this->paymentAccountMapper->toGatewayAccount($paymentAccount),
+            );
         }
+
+        $paymentAccount = $this->paymentAccountResolver->resolveForOrder($order);
+        $gatewayAccount = $this->paymentAccountMapper->toGatewayAccount($paymentAccount);
 
         if ($existing !== null) {
             $this->paymentService->expirePayment(new ExpirePaymentData(
@@ -45,20 +56,21 @@ final class PaymentInstructionService
             ));
         }
 
-        $order = Order::query()->whereKey($data->orderId)->firstOrFail();
         $expiresAt = now()->addHours((int) config('payment_gateways.instruction_ttl_hours', 24));
 
         $payment = $this->paymentService->createAwaitingTransfer(new CreateAwaitingTransferData(
             orderId: (int) $order->id,
             provider: $provider,
             amount: number_format((float) $order->total, 2, '.', ''),
-            currency: $this->resolveCurrency($order),
+            currency: $this->resolveCurrency($order, $paymentAccount),
             expiresAt: $expiresAt,
             actor: $data->actor,
             ipAddress: $data->ipAddress,
         ));
 
-        return $this->toInstructionData($payment, $config->merchantAccount);
+        $payment->forceFill(['payment_account_id' => $paymentAccount->id])->save();
+
+        return $this->toInstructionData($payment->fresh(), $gatewayAccount);
     }
 
     private function isActiveInstruction(PaymentTransaction $payment): bool
@@ -66,9 +78,12 @@ final class PaymentInstructionService
         return $payment->expires_at === null || $payment->expires_at->isFuture();
     }
 
-    private function toInstructionData(PaymentTransaction $payment, string $merchantAccount): PaymentInstructionData
-    {
+    private function toInstructionData(
+        PaymentTransaction $payment,
+        \App\DTOs\Payments\Gateway\GatewayPaymentAccount $paymentAccount,
+    ): PaymentInstructionData {
         $expiresAt = $payment->expires_at ?? now()->addHours((int) config('payment_gateways.instruction_ttl_hours', 24));
+        $merchantAccount = $paymentAccount->accountIdentifier;
 
         return new PaymentInstructionData(
             paymentId: (int) $payment->id,
@@ -83,6 +98,8 @@ final class PaymentInstructionService
                 currency: (string) $payment->currency,
                 expiresAt: Carbon::parse($expiresAt),
             ),
+            paymentAccountId: (int) ($payment->payment_account_id ?? 0) ?: null,
+            walletProvider: $paymentAccount->provider->value,
         );
     }
 
@@ -101,8 +118,12 @@ final class PaymentInstructionService
         );
     }
 
-    private function resolveCurrency(Order $order): string
+    private function resolveCurrency(Order $order, \App\Models\PaymentAccount $paymentAccount): string
     {
+        if (is_string($paymentAccount->currency) && $paymentAccount->currency !== '') {
+            return strtoupper($paymentAccount->currency);
+        }
+
         $currency = $order->getAttribute('currency');
 
         if (is_string($currency) && $currency !== '') {

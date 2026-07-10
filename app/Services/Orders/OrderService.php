@@ -13,6 +13,7 @@ use App\Services\Orders\Data\CreateOrderData;
 use App\Services\Orders\Data\CreateOrderLineItemData;
 use App\Services\Orders\Data\ResolvedOrderLineItemData;
 use App\Services\OutboxService;
+use App\Services\Payments\PaymentAccountResolver;
 use App\Services\TransactionRunner;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
@@ -24,6 +25,7 @@ class OrderService
         private TicketService $ticketService,
         private ActivityLogService $activityLogService,
         private OutboxService $outboxService,
+        private PaymentAccountResolver $paymentAccountResolver,
     ) {}
 
     public function list(int $perPage = 15, ?int $eventId = null, ?OrderStatus $status = null): LengthAwarePaginator
@@ -47,6 +49,7 @@ class OrderService
     {
         return $this->transactionRunner->run(function () use ($data): Order {
             $event = Event::query()->findOrFail($data->eventId);
+            $paymentAccount = $this->paymentAccountResolver->resolveDefaultForEvent((int) $event->id);
 
             $resolvedLineItems = $this->resolveLineItems($data->lineItems);
             $totals = $this->calculateTotals($resolvedLineItems);
@@ -54,6 +57,7 @@ class OrderService
             $order = Order::query()->create([
                 'venue_id' => $event->venue_id,
                 'event_id' => $event->id,
+                'payment_account_id' => $paymentAccount->id,
                 'customer_user_id' => $data->customerUserId,
                 'order_number' => $this->generateOrderNumber(),
                 'subtotal' => $totals['subtotal'],

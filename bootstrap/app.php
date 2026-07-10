@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
+    ->withCommands([
+        __DIR__.'/../app/Console/Commands',
+    ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -24,9 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware(['api', 'api_client'])
                 ->prefix('api')
                 ->group(base_path('routes/api_clients.php'));
-
-            Route::middleware('api')
-                ->group(base_path('routes/webhooks.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -38,7 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->is('webhooks/*'),
+            fn (Request $request) => $request->is('api/*'),
         );
 
         $exceptions->render(function (Throwable $exception, Request $request) {

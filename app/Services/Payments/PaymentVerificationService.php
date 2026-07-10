@@ -14,7 +14,7 @@ use App\Services\Payments\Data\GatewayVerifyTransactionData;
 use App\Services\Payments\Data\MarkPaidData;
 use App\Services\Payments\Data\MarkVerificationFailedData;
 use App\Services\Payments\Data\VerifyTransactionData;
-use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
+use App\Services\Payments\Mapping\GatewayPaymentAccountMapper;
 
 /**
  * Manual Wallet Transfer — orchestrates verification without direct Gateway access
@@ -25,6 +25,8 @@ final class PaymentVerificationService
     public function __construct(
         private PaymentService $paymentService,
         private PaymentGatewayService $paymentGatewayService,
+        private PaymentAccountResolver $paymentAccountResolver,
+        private GatewayPaymentAccountMapper $paymentAccountMapper,
         private CorrelationContextInterface $correlationContext,
     ) {}
 
@@ -69,14 +71,15 @@ final class PaymentVerificationService
                 ipAddress: $data->ipAddress,
             ));
 
-            $config = GatewayProviderConfig::forProvider((string) $payment->provider);
+            $paymentAccount = $this->paymentAccountResolver->resolveForPayment($payment);
+            $gatewayAccount = $this->paymentAccountMapper->toGatewayAccount($paymentAccount);
 
             $result = $this->paymentGatewayService->verifyTransaction(new GatewayVerifyTransactionData(
                 provider: (string) $payment->provider,
                 transactionNumber: $transactionNumber,
                 expectedAmount: number_format((float) $payment->amount, 2, '.', ''),
                 expectedCurrency: (string) $payment->currency,
-                merchantAccount: $config->merchantAccount,
+                paymentAccount: $gatewayAccount,
             ));
 
             if ($result->matched && $result->providerTransactionId !== null) {

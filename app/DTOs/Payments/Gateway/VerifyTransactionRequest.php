@@ -13,7 +13,7 @@ readonly class VerifyTransactionRequest extends BaseDTO
         public string $transactionNumber,
         public string $expectedAmount,
         public string $expectedCurrency,
-        public string $merchantAccount,
+        public GatewayPaymentAccount $paymentAccount,
     ) {}
 
     /**
@@ -21,11 +21,20 @@ readonly class VerifyTransactionRequest extends BaseDTO
      */
     public static function fromArray(array $data): self
     {
+        /** @var array<string, mixed> $accountData */
+        $accountData = (array) ($data['payment_account'] ?? []);
+
         return new self(
             transactionNumber: (string) $data['transaction_number'],
             expectedAmount: (string) $data['expected_amount'],
             expectedCurrency: (string) $data['expected_currency'],
-            merchantAccount: (string) $data['merchant_account'],
+            paymentAccount: new GatewayPaymentAccount(
+                provider: \App\Enums\Payments\PaymentWalletProvider::from((string) $accountData['provider']),
+                accountIdentifier: (string) $accountData['account_identifier'],
+                cashCode: isset($accountData['cash_code']) ? (string) $accountData['cash_code'] : null,
+                currency: isset($accountData['currency']) ? (string) $accountData['currency'] : null,
+                displayName: isset($accountData['display_name']) ? (string) $accountData['display_name'] : null,
+            ),
         );
     }
 
@@ -35,7 +44,13 @@ readonly class VerifyTransactionRequest extends BaseDTO
             'transaction_number' => $this->transactionNumber,
             'expected_amount' => $this->expectedAmount,
             'expected_currency' => $this->expectedCurrency,
-            'merchant_account' => $this->merchantAccount,
+            'payment_account' => [
+                'provider' => $this->paymentAccount->provider->value,
+                'account_identifier' => $this->paymentAccount->accountIdentifier,
+                'cash_code' => $this->paymentAccount->cashCode,
+                'currency' => $this->paymentAccount->currency,
+                'display_name' => $this->paymentAccount->displayName,
+            ],
         ];
     }
 }

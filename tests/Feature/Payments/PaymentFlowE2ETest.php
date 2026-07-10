@@ -55,7 +55,7 @@ class PaymentFlowE2ETest extends TestCase
         $transactionNumber = 'TX-E2E-HAPPY-001';
         $this->fakeApiSyriaFindTx($transactionNumber, [
             'amount' => '120.00',
-            'transaction_id' => 'APISYRIA-'.$transactionNumber,
+            'tran_id' => 'APISYRIA-'.$transactionNumber,
         ]);
 
         ['payment_id' => $paymentId] = $this->createPaymentInstructions($token, $order);

@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services\Commissions;
 
 use App\Enums\FinancialDomain\CommissionStatus;
+use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\FinancialDomain\RefundStatus;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Exceptions\Commissions\AdjustmentExceedsCommissionException;
@@ -26,8 +27,9 @@ use App\Services\Commissions\CommissionService;
 use App\Services\Commissions\Data\RecordCommissionAdjustmentData;
 use App\Services\Commissions\Data\RecordCommissionData;
 use App\Services\OutboxService;
-use App\Services\Payments\Data\CompletePaymentData;
-use App\Services\Payments\Data\InitiatePaymentData;
+use App\Services\Payments\Data\BeginVerificationData;
+use App\Services\Payments\Data\CreateAwaitingTransferData;
+use App\Services\Payments\Data\MarkPaidData;
 use App\Services\Payments\PaymentService;
 use App\Services\Refunds\Data\CreateRefundData;
 use App\Services\Refunds\Data\ProcessRefundData;
@@ -407,14 +409,21 @@ class CommissionServiceTest extends TestCase
         ]);
 
         $paymentService = app(PaymentService::class);
-        $payment = $paymentService->initiatePayment(new InitiatePaymentData(
+        $payment = $paymentService->createAwaitingTransfer(new CreateAwaitingTransferData(
             orderId: $order->id,
-            provider: 'shamcash',
-            providerTransactionId: 'TXN-'.uniqid(),
+            provider: 'apisyria',
             amount: $total,
             currency: 'USD',
+            expiresAt: now()->addHour(),
         ));
-        $paymentService->completePayment(new CompletePaymentData($payment->id));
+        $paymentService->beginVerification(new BeginVerificationData(
+            paymentTransactionId: $payment->id,
+            transactionNumber: 'TX-'.uniqid(),
+        ));
+        $paymentService->markPaid(new MarkPaidData(
+            paymentTransactionId: $payment->id,
+            providerTransactionId: 'APISYRIA-'.uniqid(),
+        ));
 
         return $payment->fresh();
     }

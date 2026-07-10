@@ -10,7 +10,6 @@ use App\Models\Notification;
 use App\Models\OutboxEvent;
 use App\Models\PlatformSetting;
 use App\Models\SmsTemplate;
-use App\Models\WebhookLog;
 use App\Support\Concerns\BelongsToVenue;
 use App\Support\Concerns\HasOptimisticLock;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -36,7 +35,6 @@ class InfrastructureDomainArchitectureTest extends TestCase
     /** @var list<class-string> */
     private array $platformModels = [
         PlatformSetting::class,
-        WebhookLog::class,
     ];
 
     /** @var list<class-string> */
@@ -46,7 +44,6 @@ class InfrastructureDomainArchitectureTest extends TestCase
         EmailTemplate::class,
         SmsTemplate::class,
         ActivityLog::class,
-        WebhookLog::class,
         OutboxEvent::class,
         Media::class,
         Document::class,
@@ -106,9 +103,7 @@ class InfrastructureDomainArchitectureTest extends TestCase
     public function append_only_logs_are_created_at_only(): void
     {
         $this->assertNull(ActivityLog::UPDATED_AT);
-        $this->assertNull(WebhookLog::UPDATED_AT);
         $this->assertFalse(Schema::hasColumn('activity_logs', 'updated_at'));
-        $this->assertFalse(Schema::hasColumn('webhook_logs', 'updated_at'));
     }
 
     #[Test]

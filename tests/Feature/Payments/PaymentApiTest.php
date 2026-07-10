@@ -12,10 +12,12 @@ use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\Concerns\InteractsWithPaymentFlows;
 use Tests\TestCase;
 
 class PaymentApiTest extends TestCase
 {
+    use InteractsWithPaymentFlows;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -46,24 +48,17 @@ class PaymentApiTest extends TestCase
     private function createPendingOrder(Venue $venue): array
     {
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $account = $this->attachDefaultPaymentAccount($event);
+
         $order = Order::factory()->forEvent($event)->create([
             'venue_id' => $venue->id,
+            'payment_account_id' => $account->id,
             'total' => '120.00',
             'subtotal' => '120.00',
             'status' => OrderStatus::Pending,
         ]);
 
         return ['order' => $order, 'event' => $event];
-    }
-
-    private function configureApiSyriaGateway(): void
-    {
-        config([
-            'payment_gateways.providers.apisyria.base_url' => 'https://api.syria.test',
-            'payment_gateways.providers.apisyria.api_key' => 'test-key',
-            'payment_gateways.providers.apisyria.merchant_account' => 'WALLET-001',
-            'payment_gateways.providers.apisyria.verify_transaction_path' => '/find_tx',
-        ]);
     }
 
     #[Test]
@@ -73,16 +68,8 @@ class PaymentApiTest extends TestCase
         ['order' => $order] = $this->createPendingOrder($venue);
 
         $this->configureApiSyriaGateway();
-
-        Http::fake([
-            'https://api.syria.test/find_tx' => Http::response([
-                'found' => true,
-                'transaction_id' => 'APISYRIA-TX-1001',
-                'amount' => '120.00',
-                'currency' => 'USD',
-                'receiver_account' => 'WALLET-001',
-                'status' => 'completed',
-            ], 200),
+        $this->fakeApiSyriaFindTx('TX-1001', [
+            'tran_id' => 'APISYRIA-TX-1001',
         ]);
 
         $initiate = $this->withToken($token)->postJson('/api/tenant/payments', [
@@ -156,26 +143,6 @@ class PaymentApiTest extends TestCase
     }
 
     #[Test]
-    public function owner_can_fail_legacy_pending_payment(): void
-    {
-        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
-        ['order' => $order] = $this->createPendingOrder($venue);
-
-        $payment = PaymentTransaction::factory()->forOrder($order)->create([
-            'amount' => '120.00',
-            'provider_transaction_id' => 'TXN-FAIL-1',
-        ]);
-
-        $this->withToken($token)->postJson("/api/tenant/payments/{$payment->id}/fail", [
-            'reason' => 'Provider declined',
-        ])
-            ->assertOk()
-            ->assertJsonPath('data.status', PaymentTransactionStatus::Failed->value);
-
-        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
-    }
-
-    #[Test]
     public function verify_rejects_duplicate_transaction_number(): void
     {
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
@@ -183,16 +150,8 @@ class PaymentApiTest extends TestCase
         ['order' => $secondOrder] = $this->createPendingOrder($venue);
 
         $this->configureApiSyriaGateway();
-
-        Http::fake([
-            'https://api.syria.test/find_tx' => Http::response([
-                'found' => true,
-                'transaction_id' => 'APISYRIA-TX-DUP-001',
-                'amount' => '120.00',
-                'currency' => 'USD',
-                'receiver_account' => 'WALLET-001',
-                'status' => 'completed',
-            ], 200),
+        $this->fakeApiSyriaFindTx('TX-DUP-001', [
+            'tran_id' => 'APISYRIA-TX-DUP-001',
         ]);
 
         $firstPaymentId = $this->withToken($token)->postJson('/api/tenant/payments', [
@@ -230,24 +189,6 @@ class PaymentApiTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['order_id']);
-    }
-
-    #[Test]
-    public function complete_payment_is_idempotent_for_legacy_pending_payments(): void
-    {
-        ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
-        ['order' => $order] = $this->createPendingOrder($venue);
-
-        $payment = PaymentTransaction::factory()->forOrder($order)->completed()->create([
-            'amount' => '120.00',
-            'provider_transaction_id' => 'TXN-IDEM-1',
-        ]);
-
-        $order->update(['status' => OrderStatus::Paid]);
-
-        $this->withToken($token)->postJson("/api/tenant/payments/{$payment->id}/complete")
-            ->assertOk()
-            ->assertJsonPath('data.status', PaymentTransactionStatus::Completed->value);
     }
 
     #[Test]

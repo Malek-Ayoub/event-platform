@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Requests\Payments\CompletePaymentRequest;
-use App\Http\Requests\Payments\FailPaymentRequest;
 use App\Http\Requests\Payments\InitiatePaymentRequest;
 use App\Http\Requests\Payments\ListPaymentsRequest;
 use App\Http\Requests\Payments\ShowPaymentRequest;
@@ -52,40 +50,6 @@ class PaymentController extends BaseApiController
         $payment = $this->paymentService->getPayment($request->routePaymentTransaction());
 
         return $this->respondResource(new PaymentTransactionResource($payment));
-    }
-
-    /**
-     * @deprecated Use {@see verify()} — manual transfer verification is the only supported public completion path (Batch 7.7).
-     */
-    public function complete(CompletePaymentRequest $request): JsonResponse
-    {
-        $completed = $this->paymentService->completePayment(
-            PaymentRequestMapper::toCompletePaymentData(
-                $request->routePaymentTransaction(),
-                $request->toDto(),
-                $request->user(),
-                $request->ip(),
-            ),
-        );
-
-        return $this->respondResource(new PaymentTransactionResource($completed));
-    }
-
-    /**
-     * @deprecated Use {@see verify()} — manual transfer verification is the only supported public completion path (Batch 7.7).
-     */
-    public function fail(FailPaymentRequest $request): JsonResponse
-    {
-        $failed = $this->paymentService->failPayment(
-            PaymentRequestMapper::toFailPaymentData(
-                $request->routePaymentTransaction(),
-                $request->toDto(),
-                $request->user(),
-                $request->ip(),
-            ),
-        );
-
-        return $this->respondResource(new PaymentTransactionResource($failed));
     }
 
     public function verify(VerifyPaymentRequest $request): JsonResponse

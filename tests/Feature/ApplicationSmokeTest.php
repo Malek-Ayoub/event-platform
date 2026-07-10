@@ -93,22 +93,4 @@ class ApplicationSmokeTest extends TestCase
                 'source' => 'api_client',
             ]);
     }
-
-    #[Test]
-    public function test_webhook_route_is_registered(): void
-    {
-        config(['payment_gateways.providers.shamcash.webhook_secret' => 'whsec_test']);
-
-        $payload = [
-            'event_id' => 'evt_smoke',
-            'event_type' => 'payment.unknown_event',
-        ];
-        $rawBody = json_encode($payload, JSON_THROW_ON_ERROR);
-
-        $response = $this->postJson('/webhooks/shamcash', $payload, [
-            'X-ShamCash-Signature' => hash_hmac('sha256', $rawBody, 'whsec_test'),
-        ]);
-
-        $response->assertStatus(422);
-    }
 }

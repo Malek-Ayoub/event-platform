@@ -94,8 +94,6 @@ Route::prefix('tenant')->group(function (): void {
         Route::post('payments', [PaymentController::class, 'store'])->name('tenant.payments.store');
         Route::get('payments/{paymentTransaction}', [PaymentController::class, 'show'])->name('tenant.payments.show');
         Route::post('payments/{paymentTransaction}/verify', [PaymentController::class, 'verify'])->name('tenant.payments.verify');
-        Route::post('payments/{paymentTransaction}/complete', [PaymentController::class, 'complete'])->name('tenant.payments.complete');
-        Route::post('payments/{paymentTransaction}/fail', [PaymentController::class, 'fail'])->name('tenant.payments.fail');
 
         Route::get('tax-rates', [TaxRateController::class, 'index'])->name('tenant.tax-rates.index');
         Route::post('tax-rates', [TaxRateController::class, 'store'])->name('tenant.tax-rates.store');

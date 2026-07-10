@@ -27,6 +27,7 @@ class PaymentTransaction extends Model
     protected $fillable = [
         'venue_id',
         'order_id',
+        'payment_account_id',
         'provider',
         'provider_transaction_id',
         'transaction_number',
@@ -42,6 +43,7 @@ class PaymentTransaction extends Model
         return [
             'venue_id' => 'integer',
             'order_id' => 'integer',
+            'payment_account_id' => 'integer',
             'provider' => 'string',
             'provider_transaction_id' => 'string',
             'transaction_number' => 'string',
@@ -61,6 +63,11 @@ class PaymentTransaction extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function paymentAccount(): BelongsTo
+    {
+        return $this->belongsTo(PaymentAccount::class);
     }
 
     public function refunds(): HasMany

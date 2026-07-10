@@ -3,11 +3,9 @@
 namespace Tests\Unit\Models\InfrastructureDomain;
 
 use App\Enums\InfrastructureDomain\OutboxEventStatus;
-use App\Enums\InfrastructureDomain\WebhookLogStatus;
 use App\Models\EmailTemplate;
 use App\Models\OutboxEvent;
 use App\Models\SmsTemplate;
-use App\Models\WebhookLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -15,22 +13,6 @@ use Tests\TestCase;
 class InfrastructureDomainScopesTest extends TestCase
 {
     use RefreshDatabase;
-
-    #[Test]
-    public function webhook_log_scopes_filter_by_status(): void
-    {
-        WebhookLog::factory()->create(['status' => WebhookLogStatus::Received]);
-        $failed = WebhookLog::factory()->failed()->create();
-        $processed = WebhookLog::factory()->processed()->create();
-
-        $this->assertCount(1, WebhookLog::query()->failed()->get());
-        $this->assertTrue(WebhookLog::query()->failed()->first()->is($failed));
-
-        $this->assertCount(1, WebhookLog::query()->processed()->get());
-        $this->assertTrue(WebhookLog::query()->processed()->first()->is($processed));
-
-        $this->assertCount(1, WebhookLog::query()->withStatus(WebhookLogStatus::Received)->get());
-    }
 
     #[Test]
     public function outbox_event_scopes_filter_pending_failed_and_processed(): void

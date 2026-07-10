@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int $id
  * @property int $venue_id
  * @property int $event_id
+ * @property int|null $payment_account_id
  * @property int|null $customer_user_id
  * @property string $order_number
  * @property OrderStatus $status
@@ -28,6 +29,7 @@ class Order extends Model
     protected $fillable = [
         'venue_id',
         'event_id',
+        'payment_account_id',
         'customer_user_id',
         'order_number',
         'subtotal',
@@ -50,6 +52,7 @@ class Order extends Model
         return [
             'venue_id' => 'integer',
             'event_id' => 'integer',
+            'payment_account_id' => 'integer',
             'customer_user_id' => 'integer',
             'order_number' => 'string',
             'subtotal' => 'decimal:2',
@@ -76,6 +79,11 @@ class Order extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
+    }
+
+    public function paymentAccount(): BelongsTo
+    {
+        return $this->belongsTo(PaymentAccount::class);
     }
 
     public function customer(): BelongsTo

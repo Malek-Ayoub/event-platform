@@ -3,8 +3,6 @@
 namespace App\Services\Payments\Gateway\Support;
 
 use App\Contracts\Payments\Http\GatewayHttpResponse;
-use App\DTOs\Payments\Gateway\InitiatePaymentRequest;
-use App\DTOs\Payments\Gateway\InitiatePaymentResponse;
 use App\DTOs\Payments\Gateway\RefundRequest;
 use App\DTOs\Payments\Gateway\RefundResponse;
 use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
@@ -14,60 +12,6 @@ use Throwable;
 
 final class GatewayResponseMapper
 {
-    public function initiateSuccess(
-        string $provider,
-        string $providerTransactionId,
-        string $providerStatus,
-        ?string $providerReference = null,
-        ?string $redirectUrl = null,
-        array $raw = [],
-    ): InitiatePaymentResponse {
-        return new InitiatePaymentResponse(
-            providerTransactionId: $providerTransactionId,
-            status: $providerStatus,
-            outcome: GatewayOutcome::Success,
-            redirectUrl: $redirectUrl,
-            providerMetadata: GatewayProviderMetadata::build(
-                provider: $provider,
-                providerTransactionId: $providerTransactionId,
-                providerReference: $providerReference ?? $providerTransactionId,
-                providerStatus: $providerStatus,
-                raw: $raw,
-            ),
-        );
-    }
-
-    public function initiateFailure(
-        string $provider,
-        InitiatePaymentRequest $request,
-        GatewayOutcome $outcome,
-        string $errorMessage,
-        string $providerTransactionId = '',
-        ?string $providerReference = null,
-        ?string $providerStatus = null,
-        ?int $httpStatus = null,
-        array $raw = [],
-    ): InitiatePaymentResponse {
-        return new InitiatePaymentResponse(
-            providerTransactionId: $providerTransactionId,
-            status: 'failed',
-            outcome: $outcome,
-            redirectUrl: null,
-            providerMetadata: GatewayProviderMetadata::build(
-                provider: $provider,
-                providerTransactionId: $providerTransactionId,
-                providerReference: $providerReference ?? (string) $request->orderId,
-                providerStatus: $providerStatus ?? 'failed',
-                raw: array_filter([
-                    'error' => $errorMessage,
-                    'order_id' => $request->orderId,
-                    'http_status' => $httpStatus,
-                    'response' => $raw,
-                ], static fn ($value) => $value !== null),
-            ),
-        );
-    }
-
     public function refundSuccess(
         string $provider,
         string $providerRefundId,

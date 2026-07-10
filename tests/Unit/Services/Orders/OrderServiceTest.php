@@ -25,10 +25,12 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
+use Tests\Support\Concerns\InteractsWithPaymentFlows;
 use Tests\TestCase;
 
 class OrderServiceTest extends TestCase
 {
+    use InteractsWithPaymentFlows;
     use RefreshDatabase;
 
     #[Test]
@@ -38,6 +40,7 @@ class OrderServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create([
             'price' => 100,
             'quantity' => 5,
@@ -58,6 +61,7 @@ class OrderServiceTest extends TestCase
         $this->assertSame('200.00', $order->total);
         $this->assertCount(2, $order->tickets);
         $this->assertSame(2, $ticketType->fresh()->quantity_sold);
+        $this->assertNotNull($order->payment_account_id);
 
         $this->assertDatabaseHas('activity_logs', [
             'venue_id' => $venue->id,
@@ -93,6 +97,7 @@ class OrderServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
         $zone = Zone::factory()->forEvent($event)->create();
         $table = VenueTable::factory()->forZone($zone)->create();
@@ -119,6 +124,7 @@ class OrderServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create([
             'price' => 100,
             'quantity' => 5,
@@ -146,6 +152,7 @@ class OrderServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
         $zone = Zone::factory()->forEvent($event)->create();
         $table = VenueTable::factory()->forZone($zone)->create();
@@ -184,6 +191,7 @@ class OrderServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create([
             'quantity' => 1,
             'quantity_sold' => 0,
@@ -216,6 +224,7 @@ class OrderServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
 
         $this->mock(ActivityLogService::class, function ($mock): void {
@@ -247,6 +256,7 @@ class OrderServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
 
         $this->mock(OutboxService::class, function ($mock): void {

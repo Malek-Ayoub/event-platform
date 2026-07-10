@@ -3,9 +3,11 @@
 namespace Tests\Unit\Services\Payments;
 
 use App\Contracts\Payments\PaymentVerificationGateway;
+use App\DTOs\Payments\Gateway\GatewayPaymentAccount;
 use App\DTOs\Payments\Gateway\VerifyTransactionRequest;
 use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
 use App\Enums\Payments\GatewayOutcome;
+use App\Enums\Payments\PaymentWalletProvider;
 
 final class ApiSyriaVerificationGatewayStub implements PaymentVerificationGateway
 {
@@ -29,9 +31,19 @@ final class ApiSyriaVerificationGatewayStub implements PaymentVerificationGatewa
             found: true,
             amount: $request->expectedAmount,
             currency: $request->expectedCurrency,
-            receiverAccount: $request->merchantAccount,
+            receiverAccount: $request->paymentAccount->receiverAccount(),
             providerTransactionId: 'APISYRIA-'.$request->transactionNumber,
             rawStatus: 'completed',
+        );
+    }
+
+    public static function shamcashAccount(string $accountIdentifier = 'WALLET-001'): GatewayPaymentAccount
+    {
+        return new GatewayPaymentAccount(
+            provider: PaymentWalletProvider::ShamCash,
+            accountIdentifier: $accountIdentifier,
+            currency: 'USD',
+            displayName: 'Test ShamCash',
         );
     }
 }

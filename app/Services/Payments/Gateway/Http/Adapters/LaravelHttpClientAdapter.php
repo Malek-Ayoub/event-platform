@@ -25,13 +25,62 @@ final class LaravelHttpClientAdapter implements HttpClientInterface
         int $retryAttempts,
         int $retryDelayMs,
     ): GatewayHttpResponse {
+        return $this->send(
+            method: 'post',
+            url: $url,
+            payload: $payload,
+            headers: $headers,
+            connectTimeout: $connectTimeout,
+            requestTimeout: $requestTimeout,
+            retryAttempts: $retryAttempts,
+            retryDelayMs: $retryDelayMs,
+        );
+    }
+
+    public function get(
+        string $url,
+        array $headers,
+        int $connectTimeout,
+        int $requestTimeout,
+        int $retryAttempts,
+        int $retryDelayMs,
+    ): GatewayHttpResponse {
+        return $this->send(
+            method: 'get',
+            url: $url,
+            payload: [],
+            headers: $headers,
+            connectTimeout: $connectTimeout,
+            requestTimeout: $requestTimeout,
+            retryAttempts: $retryAttempts,
+            retryDelayMs: $retryDelayMs,
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     * @param  array<string, mixed>  $payload
+     */
+    private function send(
+        string $method,
+        string $url,
+        array $payload,
+        array $headers,
+        int $connectTimeout,
+        int $requestTimeout,
+        int $retryAttempts,
+        int $retryDelayMs,
+    ): GatewayHttpResponse {
         try {
             $pending = $this->http
                 ->acceptJson()
-                ->asJson()
                 ->withHeaders($headers)
                 ->connectTimeout($connectTimeout)
                 ->timeout($requestTimeout);
+
+            if ($method === 'post') {
+                $pending = $pending->asJson();
+            }
 
             if ($retryAttempts > 0) {
                 $pending = $pending->retry(
@@ -42,7 +91,10 @@ final class LaravelHttpClientAdapter implements HttpClientInterface
                 );
             }
 
-            $response = $pending->post($url, $payload);
+            $response = $method === 'post'
+                ? $pending->post($url, $payload)
+                : $pending->get($url);
+
             $body = $response->json();
 
             return new GatewayHttpResponse(

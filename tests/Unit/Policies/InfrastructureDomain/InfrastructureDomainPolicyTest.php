@@ -10,12 +10,10 @@ use App\Models\PlatformSetting;
 use App\Models\SmsTemplate;
 use App\Models\User;
 use App\Models\Venue;
-use App\Models\WebhookLog;
 use App\Policies\ActivityLogPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PlatformSettingPolicy;
 use App\Policies\TemplatePolicy;
-use App\Policies\WebhookLogPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Support\Concerns\SeedsPermissions;
@@ -43,7 +41,6 @@ class InfrastructureDomainPolicyTest extends TestCase
         $this->assertTrue(app(TemplatePolicy::class)->update($admin, $fixtures['emailTemplate']));
         $this->assertTrue(app(TemplatePolicy::class)->update($admin, $fixtures['smsTemplate']));
         $this->assertTrue(app(ActivityLogPolicy::class)->view($admin, $fixtures['activityLog']));
-        $this->assertTrue(app(WebhookLogPolicy::class)->view($admin, $fixtures['webhookLog']));
     }
 
     #[Test]
@@ -62,14 +59,13 @@ class InfrastructureDomainPolicyTest extends TestCase
     }
 
     #[Test]
-    public function owner_cannot_manage_platform_settings_or_webhook_logs(): void
+    public function owner_cannot_manage_platform_settings(): void
     {
         ['user' => $owner] = $this->createVenueOwner();
         $fixtures = $this->createInfrastructureFixtures();
 
         $this->assertFalse(app(PlatformSettingPolicy::class)->view($owner, $fixtures['platformSetting']));
         $this->assertFalse(app(PlatformSettingPolicy::class)->update($owner, $fixtures['platformSetting']));
-        $this->assertFalse(app(WebhookLogPolicy::class)->view($owner, $fixtures['webhookLog']));
     }
 
     #[Test]
@@ -124,8 +120,7 @@ class InfrastructureDomainPolicyTest extends TestCase
      *     notification: Notification,
      *     emailTemplate: EmailTemplate,
      *     smsTemplate: SmsTemplate,
-     *     activityLog: ActivityLog,
-     *     webhookLog: WebhookLog
+     *     activityLog: ActivityLog
      * }
      */
     private function createInfrastructureFixtures(?Venue $venue = null, ?User $user = null): array
@@ -144,7 +139,6 @@ class InfrastructureDomainPolicyTest extends TestCase
             'emailTemplate' => EmailTemplate::factory()->forVenue($venue)->create(),
             'smsTemplate' => SmsTemplate::factory()->forVenue($venue)->create(),
             'activityLog' => ActivityLog::factory()->forVenue($venue)->forActor($user)->forEntity($event)->create(),
-            'webhookLog' => WebhookLog::factory()->create(),
         ];
     }
 }

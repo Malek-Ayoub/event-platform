@@ -10,10 +10,12 @@ use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\Concerns\InteractsWithPaymentFlows;
 use Tests\TestCase;
 
 class OrderApiTest extends TestCase
 {
+    use InteractsWithPaymentFlows;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -44,6 +46,7 @@ class OrderApiTest extends TestCase
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create([
             'price' => 75,
             'quantity' => 10,
@@ -86,6 +89,7 @@ class OrderApiTest extends TestCase
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
 
         $this->withToken($token)->postJson('/api/tenant/orders', [
@@ -121,6 +125,7 @@ class OrderApiTest extends TestCase
         ['token' => $token, 'venue' => $venue] = $this->authenticateVenueOwner();
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create([
             'quantity' => 1,
             'quantity_sold' => 1,
@@ -148,6 +153,7 @@ class OrderApiTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
 
         $this->withToken($token)
@@ -174,6 +180,7 @@ class OrderApiTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $this->attachDefaultPaymentAccount($event);
         $ticketType = TicketType::factory()->forEvent($event)->create(['quantity' => 5]);
 
         $this->withToken($token)

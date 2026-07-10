@@ -5,7 +5,9 @@ namespace Tests\Unit\Services\Payments;
 use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Models\Event;
+use App\Models\EventPaymentAccount;
 use App\Models\Order;
+use App\Models\PaymentAccount;
 use App\Models\PaymentTransaction;
 use App\Services\Payments\Data\CreatePaymentInstructionsData;
 use App\Services\Payments\PaymentInstructionService;
@@ -17,15 +19,6 @@ class PaymentInstructionServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config([
-            'payment_gateways.providers.apisyria.merchant_account' => 'WALLET-001',
-        ]);
-    }
-
     #[Test]
     public function it_creates_awaiting_transfer_payment_and_returns_instructions_without_gateway_calls(): void
     {
@@ -33,8 +26,12 @@ class PaymentInstructionServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $account = PaymentAccount::factory()->forVenue($venue)->shamcash('WALLET-001')->create();
+        EventPaymentAccount::factory()->forEvent($event)->forPaymentAccount($account)->create();
+
         $order = Order::factory()->forEvent($event)->create([
             'venue_id' => $venue->id,
+            'payment_account_id' => $account->id,
             'total' => '120.00',
             'subtotal' => '120.00',
             'status' => OrderStatus::Pending,
@@ -48,11 +45,13 @@ class PaymentInstructionServiceTest extends TestCase
         ));
 
         $this->assertSame('apisyria', $instructions->provider);
-        $this->assertSame('WALLET-001', $instructions->merchantAccount);
+        $this->assertSame($account->account_identifier, $instructions->merchantAccount);
         $this->assertSame('120.00', $instructions->amount);
+        $this->assertSame($account->id, $instructions->paymentAccountId);
 
         $payment = PaymentTransaction::query()->findOrFail($instructions->paymentId);
         $this->assertSame(PaymentTransactionStatus::AwaitingTransfer, $payment->status);
+        $this->assertSame($account->id, $payment->payment_account_id);
         $this->assertNull($payment->provider_transaction_id);
         $this->assertNotNull($payment->expires_at);
 
@@ -70,8 +69,12 @@ class PaymentInstructionServiceTest extends TestCase
         $this->bindTenant($venue->id);
 
         $event = Event::factory()->create(['venue_id' => $venue->id]);
+        $account = PaymentAccount::factory()->forVenue($venue)->shamcash('WALLET-001')->create();
+        EventPaymentAccount::factory()->forEvent($event)->forPaymentAccount($account)->create();
+
         $order = Order::factory()->forEvent($event)->create([
             'venue_id' => $venue->id,
+            'payment_account_id' => $account->id,
             'total' => '75.00',
             'subtotal' => '75.00',
             'status' => OrderStatus::Pending,

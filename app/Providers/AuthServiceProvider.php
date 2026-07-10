@@ -22,7 +22,6 @@ use App\Models\TicketType;
 use App\Models\User;
 use App\Models\UserPermission;
 use App\Models\Venue;
-use App\Models\WebhookLog;
 use App\Policies\ActivityLogPolicy;
 use App\Policies\CategoryPolicy;
 use App\Policies\CouponPolicy;
@@ -42,7 +41,6 @@ use App\Policies\TicketTypePolicy;
 use App\Policies\UserPermissionPolicy;
 use App\Policies\UserPolicy;
 use App\Policies\VenuePolicy;
-use App\Policies\WebhookLogPolicy;
 use App\Services\Authorization\PermissionGateRegistrar;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -73,7 +71,6 @@ class AuthServiceProvider extends ServiceProvider
         EmailTemplate::class => TemplatePolicy::class,
         SmsTemplate::class => TemplatePolicy::class,
         ActivityLog::class => ActivityLogPolicy::class,
-        WebhookLog::class => WebhookLogPolicy::class,
     ];
 
     public function boot(): void

@@ -22,4 +22,16 @@ interface HttpClientInterface
         int $retryAttempts,
         int $retryDelayMs,
     ): GatewayHttpResponse;
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    public function get(
+        string $url,
+        array $headers,
+        int $connectTimeout,
+        int $requestTimeout,
+        int $retryAttempts,
+        int $retryDelayMs,
+    ): GatewayHttpResponse;
 }

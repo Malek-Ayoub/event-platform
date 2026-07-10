@@ -64,7 +64,7 @@
 | 4 | **Domain Models & Authorization** | كل Eloquent Models + علاقات + Policies + RBAC كامل | ✅ |
 | 5 | **Domain Services** | `TransactionRunner`, Services, Actions, DTOs (§5.1–§5.9) — **لا** Repository/CQRS/ES | ✅ |
 | 6 | **APIs (Business Controllers)** | Events, Ticket Types, Orders, Reservations, Products, Coupons, … | ✅ 6.1–6.8 |
-| 7 | **Payments** | Gateway, Manual Wallet Transfer Verification, Refunds, Commission Adjustments | ⏳ 7.1–7.8 (نموذج الدفع تغيّر إلى Manual Wallet Transfer — انظر §7.9) |
+| 7 | **Payments** | Gateway, Manual Wallet Transfer Verification, Refunds, Commission Adjustments | ✅ 7.1–7.9 |
 | 8 | **Notifications** | Email, SMS, Templates, Outbox Worker | — |
 | 9 | **Production Hardening** | Performance, Queues, Monitoring, Security, Load Testing | — |
 
@@ -868,7 +868,9 @@ ActivityLog + Outbox  →  عبر TransactionRunner فقط (Phase 5)
 | **7.6** | Gateway Contract Redesign (`verifyTransaction`) + Verification DTOs + `PaymentTransactionStatus` state machine الجديدة + `PaymentInstructionService`/`PaymentVerificationService` + Architecture Guards + global `transaction_number` uniqueness (§7.9.6.1) | 7.1 (Registry/Contracts فقط) | ✅ |
 | **7.7** | API Wiring: `PaymentController::store()` مُعدَّل + `PaymentController::verify()` جديد + Routes + Requests + Resources/OpenAPI + Deprecation صريح لـ `complete`/`fail` | 7.6 | ✅ Done |
 | **7.8** | Manual Transfer E2E Integration (`PaymentFlowE2ETest` الجديد لمسار Manual Transfer) | 7.6–7.7 | ✅ Done |
-| **7.9** *(Cleanup — batch مستقل)* | إزالة فعلية للكود Legacy الخامل (Hosted checkout gateways, signature verifiers, `WebhookController` إن قُرِّر إزالته لاحقًا) — **فقط** بعد اكتمال 7.6–7.8 واختبارها في الإنتاج | 7.6–7.8 | ⏳ Planned (لا تُنفَّذ قبل استقرار المسار الجديد) |
+| **7.9** *(Cleanup — batch مستقل)* | إزالة فعلية للكود Legacy الخامل (webhooks, hosted-checkout initiate, signature verifiers, `complete`/`fail` endpoints) + migration `drop_webhook_logs` | 7.6–7.8 | ✅ Done |
+| **7.10** *(Live Integration)* | API Syria HTTP الحقيقي (GET + X-Api-Key) + `apisyria:probe` + per-provider timeouts | 7.9 | ✅ Done |
+| **7.11** *(Multi-tenant Payment Accounts)* | `payment_accounts` per venue + `PaymentAccountResolver` + gateway receives `GatewayPaymentAccount` (no global merchant config) | 7.10 | ✅ Done |
 
 كل batch ينتهي باختبارات خضراء قبل التالي. **تفاصيل Batches 7.6–7.9 في §7.9 (subsection) أدناه.** *(ملاحظة تسمية: "Batch 7.9" و subsection "§7.9" رقمان مستقلان — الأول رقم دفعة تنفيذية، الثاني رقم قسم في هذه الوثيقة يوثّق كل الدفعات 7.6–7.9).*
 
@@ -1300,7 +1302,7 @@ interface PaymentGateway
 | 1 | Transaction موجودة فعليًا عند API Syria (`find_tx` يعيد نتيجة، `found = true`) |
 | 2 | `amount` في الاستجابة == `expected_amount` للـ `PaymentTransaction` (مطابقة تامة، لا هامش تسامح إلا إن وثّقه API Syria) |
 | 3 | `currency` في الاستجابة == عملة `PaymentTransaction` |
-| 4 | `receiverAccount` في الاستجابة == `merchant_account` المُهيَّأ للنظام (config — بدون hardcode) |
+| 4 | `receiverAccount` في الاستجابة == `account_identifier` لحساب الدفع (`payment_accounts`) المرتبط بـ venue الطلب — **لا** config/global env |
 | 5 | `transaction_number` **فريد على مستوى المنصة بالكامل** — لم يُستخدم من قبل لأي `PaymentTransaction` آخر، بأي حالة (انظر §7.9.6.1) |
 | 6 | `PaymentTransaction` الحالية بحالة `awaiting_transfer` أو `verifying` وقت التحقق (**ليست** `paid`/`failed`/`expired`؛ إن كانت `expired` → رفض فوري بدون استدعاء Gateway) |
 
@@ -1469,7 +1471,7 @@ awaiting_transfer → expired                              [عبر scheduled job
 
 **Batch 7.8 (لاحقًا):** E2E جديد يغطي: نجاح → `paid`، رفض كل شرط من §7.9.6 على حدة، إعادة محاولة بعد فشل، رفض transaction_number مُعاد استخدامه، انتهاء الصلاحية (`expired`) يرفض بدون استدعاء Gateway، Correlation ID ساري المفعول عبر `ActivityLog`/`Outbox` لمسار `verify`.
 
-**Batch 7.9 — Cleanup (مستقل، بعد استقرار الإنتاج):** حذف فعلي للكود Legacy الخامل (§7.9.2/§7.9.10 بند 5) + حذف `complete`/`fail` endpoints + إزالة الاختبارات القديمة غير ذات الصلة (لا تعطيلها بـ `@skip` — حذف نظيف بعد التأكد من عدم الحاجة إليها).
+**Batch 7.9 — Cleanup (✅ Done):** حُذف فعليًا webhook infra + hosted-checkout initiate + `complete`/`fail` endpoints + اختبارات legacy؛ `RefundGateway` (ShamCash/Syriatel) و `ApiSyriaGateway::verifyTransaction()` بقيا؛ **477/477** tests green.
 
 ---
 
@@ -2734,16 +2736,18 @@ Domain & Authorization (§1.1)
   ☑ Phase 6.6 — Payment APIs
   ☑ Phase 6.7 — Platform APIs
   ☑ Phase 6.8 — OpenAPI/Swagger + Architecture Guards
-☐ Phase 7  — Payments (§7.0–§7.9)
+☑ Phase 7  — Payments (§7.0–§7.9)
   ☑ Phase 7.1 — Gateway Abstractions (Interfaces + DTOs + Registry)          [legacy — superseded by §7.9]
   ☑ Phase 7.2 — Gateway Implementations (ShamCash, Syriatel Cash)           [legacy — superseded by §7.9]
-  ☑ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)      [legacy — superseded by §7.9]
+  ☑ Phase 7.3 — Webhook Infrastructure (Signature + Replay Protection)      [legacy — removed in 7.9]
   ☑ Phase 7.4 — PaymentGatewayService Orchestration                        [legacy — superseded by §7.9]
   ☑ Phase 7.5 — E2E Integration + GatewayArchitectureGuardTest              [legacy — superseded by §7.9]
   ☑ Phase 7.6 — Gateway Contract Redesign (verifyTransaction) + DTOs + PaymentTransactionStatus + PaymentInstructionService/PaymentVerificationService + Architecture Guards + global transaction_number uniqueness (§7.9) ✅
   ☑ Phase 7.7 — API Wiring: PaymentController::store()/verify() + Routes + Requests/Resources/OpenAPI + Deprecate complete/fail (§7.9)
   ☑ Phase 7.8 — Manual Transfer E2E Integration (§7.9)
-  ☐ Phase 7.9 — Cleanup (مستقل): حذف فعلي لكود Legacy الخامل + complete/fail endpoints (§7.9) — فقط بعد استقرار 7.6–7.8
+  ☑ Phase 7.9 — Cleanup: webhook infra + hosted-checkout legacy + complete/fail endpoints removed (§7.9)
+  ☑ Phase 7.10 — API Syria live HTTP integration + apisyria:probe command
+  ☑ Phase 7.11 — Multi-tenant payment_accounts + PaymentAccountResolver
 ☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
 ☐ Phase 9  — Production Hardening
 

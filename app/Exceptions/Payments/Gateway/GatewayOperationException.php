@@ -16,16 +16,6 @@ final class GatewayOperationException extends RuntimeException
         parent::__construct($message);
     }
 
-    public static function forInitiate(string $provider, GatewayOutcome $outcome, string $reason): self
-    {
-        return new self(
-            message: "Payment initiation failed for provider [{$provider}]: {$reason}",
-            provider: $provider,
-            outcome: $outcome,
-            operation: 'initiate',
-        );
-    }
-
     public static function forRefund(string $provider, GatewayOutcome $outcome, string $reason): self
     {
         return new self(

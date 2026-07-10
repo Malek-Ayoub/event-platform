@@ -2,9 +2,10 @@
 
 namespace App\Services\Payments\Data;
 
+use App\DTOs\Payments\Gateway\GatewayPaymentAccount;
+
 /**
  * ACL-level input to `PaymentGatewayService::verifyTransaction()` (Batch 7.6).
- * Pure primitives only — no Eloquent models cross this boundary.
  */
 readonly class GatewayVerifyTransactionData
 {
@@ -13,6 +14,6 @@ readonly class GatewayVerifyTransactionData
         public string $transactionNumber,
         public string $expectedAmount,
         public string $expectedCurrency,
-        public string $merchantAccount,
+        public GatewayPaymentAccount $paymentAccount,
     ) {}
 }
