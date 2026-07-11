@@ -12,4 +12,12 @@ return [
         'size' => 300,
         'margin' => 10,
     ],
+
+    'artifact' => [
+        'default_version' => 1,
+    ],
+
+    'snapshot' => [
+        'default_currency' => env('TICKET_SNAPSHOT_CURRENCY', 'USD'),
+    ],
 ];

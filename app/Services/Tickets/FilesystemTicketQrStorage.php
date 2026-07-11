@@ -18,6 +18,11 @@ final class FilesystemTicketQrStorage implements TicketQrStorageInterface
         return $this->disk()->exists($path);
     }
 
+    public function get(string $path): string
+    {
+        return $this->disk()->get($path);
+    }
+
     public function put(string $path, string $contents): void
     {
         $this->disk()->put($path, $contents);

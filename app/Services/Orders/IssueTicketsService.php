@@ -10,6 +10,7 @@ use App\Models\TicketType;
 use App\Services\Orders\Data\IssuedTicketsResult;
 use App\Services\Orders\Data\ResolvedOrderLineItemData;
 use App\Services\OutboxService;
+use App\Services\Tickets\Snapshots\TicketSnapshotService;
 use App\Services\TransactionRunner;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -25,6 +26,7 @@ final class IssueTicketsService
     public function __construct(
         private TransactionRunner $transactionRunner,
         private TicketService $ticketService,
+        private TicketSnapshotService $ticketSnapshotService,
         private OutboxService $outboxService,
     ) {}
 
@@ -37,7 +39,13 @@ final class IssueTicketsService
                 throw OrderNotEligibleForTicketIssuanceException::forOrder($orderId, $order->status);
             }
 
-            $order->load(['orderItems.ticketType', 'event', 'tickets']);
+            $order->load([
+                'orderItems.ticketType',
+                'event.venue',
+                'paymentAccount',
+                'reservations.tableSeat.venueTable',
+                'tickets',
+            ]);
 
             $event = $order->event;
 
@@ -67,6 +75,7 @@ final class IssueTicketsService
             $newTickets = $this->ticketService->issueForOrder($order, $event, $remainingLineItems);
 
             foreach ($newTickets as $ticket) {
+                $this->ticketSnapshotService->captureForTicket($ticket, $order);
                 $this->publishTicketIssued($ticket);
             }
 

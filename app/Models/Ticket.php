@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $id
@@ -78,6 +80,16 @@ class Ticket extends Model
     public function ticketType(): BelongsTo
     {
         return $this->belongsTo(TicketType::class);
+    }
+
+    public function snapshot(): HasOne
+    {
+        return $this->hasOne(TicketSnapshot::class);
+    }
+
+    public function artifacts(): HasMany
+    {
+        return $this->hasMany(TicketArtifact::class);
     }
 
     public function checkedInBy(): BelongsTo

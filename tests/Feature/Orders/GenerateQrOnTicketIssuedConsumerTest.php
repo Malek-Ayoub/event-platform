@@ -10,6 +10,9 @@ use App\Models\Order;
 use App\Models\OutboxEvent;
 use App\Models\Scopes\BelongsToVenueScope;
 use App\Models\Ticket;
+use App\Models\TicketArtifact;
+use App\Enums\Tickets\TicketArtifactStatus;
+use App\Enums\Tickets\TicketArtifactType;
 use App\Models\TicketType;
 use App\Repositories\ConsumerReceiptRepository;
 use App\Services\Orders\Data\CreateOrderData;
@@ -90,6 +93,17 @@ class GenerateQrOnTicketIssuedConsumerTest extends TestCase
             $path = $storage->pathForToken($ticket->qr_token);
             $this->assertTrue(Storage::disk('local')->exists($path));
             $this->assertSame($path, $ticket->fresh()->qr_code_path);
+
+            $artifact = TicketArtifact::query()
+                ->where('ticket_id', $ticket->id)
+                ->where('type', TicketArtifactType::Qr)
+                ->first();
+
+            $this->assertNotNull($artifact);
+            $this->assertSame(TicketArtifactStatus::Ready, $artifact->status);
+            $this->assertSame($path, $artifact->path);
+            $this->assertSame('image/png', $artifact->mime_type);
+            $this->assertNotNull($artifact->checksum);
         }
 
         $this->assertSame(2, $this->generator->calls);

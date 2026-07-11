@@ -8,6 +8,8 @@ interface TicketQrStorageInterface
 
     public function exists(string $path): bool;
 
+    public function get(string $path): string;
+
     /**
      * @param  non-empty-string  $contents
      */
