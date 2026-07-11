@@ -5,9 +5,11 @@ namespace App\Services\Orders;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Exceptions\Orders\OrderNotEligibleForTicketIssuanceException;
 use App\Models\Order;
+use App\Models\Ticket;
 use App\Models\TicketType;
 use App\Services\Orders\Data\IssuedTicketsResult;
 use App\Services\Orders\Data\ResolvedOrderLineItemData;
+use App\Services\OutboxService;
 use App\Services\TransactionRunner;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -23,6 +25,7 @@ final class IssueTicketsService
     public function __construct(
         private TransactionRunner $transactionRunner,
         private TicketService $ticketService,
+        private OutboxService $outboxService,
     ) {}
 
     public function issueForPaidOrder(int $orderId): IssuedTicketsResult
@@ -45,27 +48,32 @@ final class IssueTicketsService
             $expectedTotal = (int) $order->orderItems->sum('quantity');
 
             if ($expectedTotal === 0) {
-                return new IssuedTicketsResult([], newlyIssued: false);
+                return new IssuedTicketsResult([], newlyIssued: false, newlyIssuedTickets: []);
             }
 
             $existingTickets = $order->tickets->all();
             $issuedTotal = count($existingTickets);
 
             if ($issuedTotal >= $expectedTotal) {
-                return new IssuedTicketsResult($existingTickets, newlyIssued: false);
+                return new IssuedTicketsResult($existingTickets, newlyIssued: false, newlyIssuedTickets: []);
             }
 
             $remainingLineItems = $this->remainingLineItems($order);
 
             if ($remainingLineItems === []) {
-                return new IssuedTicketsResult($existingTickets, newlyIssued: false);
+                return new IssuedTicketsResult($existingTickets, newlyIssued: false, newlyIssuedTickets: []);
             }
 
             $newTickets = $this->ticketService->issueForOrder($order, $event, $remainingLineItems);
 
+            foreach ($newTickets as $ticket) {
+                $this->publishTicketIssued($ticket);
+            }
+
             return new IssuedTicketsResult(
-                array_merge($existingTickets, $newTickets),
+                tickets: array_merge($existingTickets, $newTickets),
                 newlyIssued: true,
+                newlyIssuedTickets: $newTickets,
             );
         });
     }
@@ -132,5 +140,22 @@ final class IssueTicketsService
         }
 
         return number_format((float) $orderItem->unit_price, 2, '.', '');
+    }
+
+    /**
+     * Publishes the general ticket.issued domain event for downstream artifact and
+     * notification consumers (QR, PDF, email, analytics, wallet passes, etc.).
+     */
+    private function publishTicketIssued(Ticket $ticket): void
+    {
+        $this->outboxService->record(
+            eventType: 'ticket.issued',
+            aggregate: $ticket,
+            payload: [
+                'ticket_id' => $ticket->id,
+                'order_id' => $ticket->order_id,
+                'event_id' => $ticket->event_id,
+            ],
+        );
     }
 }

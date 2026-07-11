@@ -98,6 +98,23 @@ class OrderServiceArchitectureTest extends TestCase
     }
 
     #[Test]
+    public function issue_tickets_service_uses_outbox_service_for_ticket_issued_events(): void
+    {
+        $reflection = new \ReflectionClass(IssueTicketsService::class);
+        $constructor = $reflection->getConstructor();
+        $this->assertNotNull($constructor);
+
+        $parameters = array_map(
+            fn ($parameter) => $parameter->getType() instanceof \ReflectionNamedType
+                ? $parameter->getType()->getName()
+                : null,
+            $constructor->getParameters(),
+        );
+
+        $this->assertContains(OutboxService::class, $parameters);
+    }
+
+    #[Test]
     public function ticket_serial_service_does_not_write_audit_or_outbox_records(): void
     {
         foreach ([TicketSerialService::class, TicketService::class, TicketNumberGenerator::class, QrTokenGenerator::class] as $serviceClass) {

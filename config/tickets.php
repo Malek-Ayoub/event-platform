@@ -6,4 +6,10 @@ return [
         'event_id_pad' => 6,
         'sequence_pad' => 6,
     ],
+
+    'qr' => [
+        'disk' => env('TICKET_QR_DISK', 'local'),
+        'size' => 300,
+        'margin' => 10,
+    ],
 ];

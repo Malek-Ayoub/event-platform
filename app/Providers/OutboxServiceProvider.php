@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Repositories\ConsumerReceiptRepository;
 use App\Repositories\OutboxRepository;
+use App\Services\Outbox\Consumers\GenerateQrOnTicketIssuedConsumer;
 use App\Services\Outbox\Consumers\IssueTicketsOnOrderPaidConsumer;
 use App\Services\Outbox\Consumers\RecordCommissionAdjustmentOnRefundProcessedConsumer;
 use App\Services\Outbox\Consumers\RecordCommissionOnOrderPaidConsumer;
@@ -24,6 +25,7 @@ class OutboxServiceProvider extends ServiceProvider
         $this->app->singleton(OutboxConsumerRegistry::class, function ($app): OutboxConsumerRegistry {
             $registry = new OutboxConsumerRegistry;
             $registry->register($app->make(IssueTicketsOnOrderPaidConsumer::class));
+            $registry->register($app->make(GenerateQrOnTicketIssuedConsumer::class));
             $registry->register($app->make(RecordCommissionOnOrderPaidConsumer::class));
             $registry->register($app->make(SendOrderPaidEmailConsumer::class));
             $registry->register($app->make(RecordCommissionAdjustmentOnRefundProcessedConsumer::class));
