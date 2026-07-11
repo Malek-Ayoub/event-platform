@@ -119,4 +119,39 @@ class TicketArtifactServiceTest extends TestCase
         $this->assertSame(TicketArtifactStatus::Ready, $updated->status);
         $this->assertNotNull($service->findReadyForTicket($ticket, TicketArtifactType::Qr));
     }
+
+    #[Test]
+    public function append_version_creates_a_new_row_without_replacing_previous_versions(): void
+    {
+        ['venue' => $venue] = $this->createVenueOwner();
+        $this->bindTenant($venue->id);
+
+        $ticket = Ticket::factory()->create(['venue_id' => $venue->id]);
+        $service = app(TicketArtifactService::class);
+
+        $service->appendVersion(
+            ticket: $ticket,
+            type: TicketArtifactType::Pdf,
+            disk: 'local',
+            path: 'tickets/pdf/1/v1.pdf',
+            mimeType: 'application/pdf',
+            binaryContents: 'pdf-v1',
+            version: 1,
+        );
+
+        $service->appendVersion(
+            ticket: $ticket,
+            type: TicketArtifactType::Pdf,
+            disk: 'local',
+            path: 'tickets/pdf/1/v2.pdf',
+            mimeType: 'application/pdf',
+            binaryContents: 'pdf-v2',
+            version: 2,
+        );
+
+        $this->assertSame(2, TicketArtifact::query()->where('ticket_id', $ticket->id)->count());
+        $this->assertSame('tickets/pdf/1/v1.pdf', $service->findForTicket($ticket, TicketArtifactType::Pdf, 1)?->path);
+        $this->assertSame('tickets/pdf/1/v2.pdf', $service->findLatestReady($ticket, TicketArtifactType::Pdf)?->path);
+        $this->assertSame(2, $service->findLatestReady($ticket, TicketArtifactType::Pdf)?->version);
+    }
 }

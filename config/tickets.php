@@ -13,6 +13,10 @@ return [
         'margin' => 10,
     ],
 
+    'pdf' => [
+        'disk' => env('TICKET_PDF_DISK', 'local'),
+    ],
+
     'artifact' => [
         'default_version' => 1,
     ],
