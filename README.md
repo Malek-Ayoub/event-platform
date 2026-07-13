@@ -1,58 +1,150 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Event Platform
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Multi-tenant event ticketing backend for Syria. Buyers pay organizers directly via mobile wallets; the platform tracks commission receivable, issues tickets, and provides settlement, reporting, and dashboard APIs.
 
-## About Laravel
+**Backend Status: Frozen (v1)** — tagged `v1.0-backend-freeze`. New backend features are limited to bug fixes, security, performance, or customer-driven changes. Frontend work continues in a separate repository.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Current Status
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Area | Status |
+|------|--------|
+| Backend | v1 Feature Freeze |
+| Frontend | Planned (`event-platform-frontend`) |
+| Production | Pending |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Architecture Overview
 
-## Learning Laravel
+- **Multi-tenancy:** Subdomain-based venue resolution (`{venue}.base_domain`) with `BelongsToVenue` global scope on tenant tables.
+- **Payments:** Manual wallet transfer + API Syria verification (no hosted checkout, no webhooks).
+- **Orders & inventory:** Atomic order reservation and ticket issuance with pessimistic locking on serial counters and ticket type capacity.
+- **Outbox:** Domain side-effects (commission ledger, QR, PDF, email) written in the same transaction as aggregate changes; processed by `php artisan outbox:process`.
+- **Ticketing:** Immutable ticket snapshots drive QR, PDF, and email artifacts.
+- **Check-in:** QR scan resolves ticket serial; idempotent check-in with audit trail.
+- **Settlement:** Append-only `settlement_entries` ledger; manual `commission_payments` for amounts received outside the platform.
+- **Read APIs:** Reports and dashboards are composition layers over existing tables — no new domain writes.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+See `docs/adr/ADR-0001-backend-v1-freeze.md` for frozen architectural decisions.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Requirements
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+- PHP 8.3+
+- Composer 2.x
+- SQLite (local development) or MySQL 8+ / PostgreSQL (production)
+- Node.js 20+ (Vite asset tooling only; backend API is standalone)
 
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Installation
 
 ```bash
-composer require laravel/boost --dev
+git clone <repository-url> event-platform
+cd event-platform
 
-php artisan boost:install
+composer install
+cp .env.example .env
+php artisan key:generate
+
+# Local SQLite (default)
+touch database/database.sqlite
+php artisan migrate --seed
+
+# Or configure MySQL in .env, then:
+# php artisan migrate --seed
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Configure tenant base domain in `.env`:
 
-## Contributing
+```env
+TENANCY_BASE_DOMAIN=localhost
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Queue Worker
 
-## Code of Conduct
+Outbox consumers and async jobs use the database queue driver by default (`QUEUE_CONNECTION=database`).
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Run a worker in development:
 
-## Security Vulnerabilities
+```bash
+php artisan queue:work
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Process outbox events (required for commission ledger, ticket QR/PDF/email):
+
+```bash
+php artisan outbox:process
+# or single batch:
+php artisan outbox:process --once
+```
+
+## Scheduler
+
+Schedule outbox processing in production (example — add to your server's cron invoking `schedule:run`, or run `outbox:process` directly):
+
+```bash
+* * * * * cd /path/to/event-platform && php artisan outbox:process --once >> /dev/null 2>&1
+```
+
+Laravel's `routes/console.php` does not register scheduled tasks by default; production cron must invoke `outbox:process` explicitly.
+
+## Storage
+
+Ticket artifacts (QR images, PDFs) are stored on the configured filesystem disk (`FILESYSTEM_DISK=local` by default). Ensure `storage/app` is writable and backed up in production.
+
+```bash
+php artisan storage:link
+```
+
+## Mail
+
+Default mailer is `log` for local development. Set SMTP (or another transport) in `.env` for production:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=
+MAIL_PORT=
+MAIL_USERNAME=
+MAIL_PASSWORD=
+```
+
+Ticket and order emails are dispatched via the outbox pipeline after payment verification.
+
+## API Documentation
+
+OpenAPI spec is generated with L5-Swagger:
+
+```bash
+php artisan l5-swagger:generate
+```
+
+- JSON spec: `storage/api-docs/api-docs.json`
+- Swagger UI: `/api/documentation` (when enabled)
+
+Key endpoints:
+
+| Audience | Examples |
+|----------|----------|
+| Tenant (organizer) | `POST /api/tenant/orders`, `POST /api/tenant/payments/{id}/verify`, `GET /api/tenant/organizer/dashboard` |
+| Platform (admin) | `GET /api/admin/reports`, `GET /api/admin/dashboard`, `POST /api/admin/commission-payments` |
+
+Authentication uses Laravel Sanctum bearer tokens.
+
+## Testing
+
+```bash
+php artisan test
+```
+
+Architecture guards and OpenAPI contract tests:
+
+```bash
+php artisan test --filter=Architecture
+php artisan test --filter=OpenApiContract
+```
+
+Code style:
+
+```bash
+vendor/bin/pint
+```
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+MIT

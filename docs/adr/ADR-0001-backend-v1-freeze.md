@@ -197,7 +197,7 @@ The following decisions are **frozen** at v1. Changes require a new ADR and shou
 - [x] All sections reviewed against actual code
 - [x] Linked commits documented
 - [x] Status changed to **Accepted**
-- [ ] `git tag v1.0-backend-freeze` created (Batch 10.2)
+- [x] `git tag v1.0-backend-freeze` created (Batch 10.2)
 
 ---
 

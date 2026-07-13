@@ -40,8 +40,8 @@
    - ✅ 8.6.1 Dashboard Overview (`GET /api/tenant/organizer/dashboard`)
 4. ✅ 8.7 Admin Dashboard API
    - ✅ 8.7.1 Dashboard Overview (`GET /api/admin/dashboard`)
-5. ⏳ Batch 10.1 — Backend Freeze Audit
-6. ⏳ Batch 10.2 — Release Preparation (`CHANGELOG`, `README`, tag)
+5. ✅ Batch 10.1 — Backend Freeze Audit
+6. ✅ Batch 10.2 — Release Preparation (`CHANGELOG`, `README`, tag `v1.0-backend-freeze`)
 7. ⏳ Frontend v1
 ```
 
@@ -2946,8 +2946,7 @@ Domain & Authorization (§1.1)
   ✅ Phase 8.5.5 — Reports (closed)
   ✅ Phase 8.6 — Organizer Dashboard API (8.6.1 overview)
   ✅ Phase 8.7 — Admin Dashboard API (8.7.1 overview)
-  ⏳ Batch 10.1 — Backend Freeze Audit
-  ☐ Batch 10.2 — Release Preparation + tag v1.0-backend-freeze
+  ✅ Batch 10.2 — Release Preparation + tag v1.0-backend-freeze
 ☐ Phase 9  — Frontend v1 (Organizer / Admin / Public / Scanner PWA)
 ☐ Phase 10 — Production Hardening + Pilot Event
 
