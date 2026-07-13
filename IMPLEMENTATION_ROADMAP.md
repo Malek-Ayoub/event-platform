@@ -1,8 +1,187 @@
 # خارطة طريق التنفيذ — منصة تذاكر الفعاليات متعددة المستأجرين (Laravel 12)
 
-> **الحالة:** المعمارية v1.3 مقفلة ونهائية. هذا المستند **لا يعيد التصميم ولا يقترح تحسينات ولا يضيف ميزات**. مهمته الوحيدة: تحويل المعمارية المقفلة (v1.0 → v1.3) إلى خطة تنفيذ Phase-by-Phase قابلة للتنفيذ آليًا دون أي قرار معماري جديد.
+> **الحالة:** المعمارية v1.3 مقفلة ونهائية. النواة الخلفية (Domain) مكتملة تقريبًا — **الأولوية الحالية:** إنهاء Backend v1 ثم الانتقال إلى Frontend v1. راجع **§v1** أدناه قبل أي تنفيذ جديد.
 >
 > **المرجع المعماري الوحيد:** `blueprint_v1_3.md` (وما يشير إليه من v1.0–v1.2). كل اسم جدول/عمود/Enum/علاقة/تدفق مذكور هنا مأخوذ حرفيًا من المعمارية المقفلة.
+>
+> **قرارات معمارية مجمّعة:** `docs/adr/ADR-0001-backend-v1-freeze.md` (تُستكمل قبل Tag `v1.0-backend-freeze`).
+
+---
+
+## §v1 — خارطة الطريق الرسمية (Backend v1 → Frontend v1)
+
+> **هذا القسم هو المرجع التشغيلي لـ Cursor والفريق.** لا تُضاف ميزات Domain جديدة إلا إذا فرضها عميل فعلي. بعد `v1.0-backend-freeze` يُعتبر المشروع **Frontend v1** — وليس "تكملة Backend".
+
+### الحالة الحالية (يوليو 2026)
+
+| المجال | الحالة |
+|---|---|
+| Multi-tenant, Events, Venues, Ticket Types, Orders | ✅ |
+| Manual Payment Verification (API Syria), Outbox, Idempotency | ✅ |
+| Ticket Issuance, QR, PDF, Email | ✅ |
+| Check-in | ✅ |
+| Commission Ledger + Settlement Read APIs (8.5.1–8.5.4) | ✅ |
+| Reports (8.5.5) | ⏳ |
+| Organizer Dashboard API (8.6) | ⏳ |
+| Admin Dashboard API (8.7) | ⏳ |
+| Frontend | ⏳ |
+| Production | ⏳ |
+
+### الترتيب النهائي للتنفيذ
+
+```text
+0. ✅ تحديث IMPLEMENTATION_ROADMAP.md
+1. ✅ إنشاء docs/adr/
+2. ⏳ 8.5.5 Reports
+3. ⏳ 8.6 Organizer Dashboard API
+4. ⏳ 8.7 Admin Dashboard API
+5. ⏳ Backend Freeze Checklist
+6. ⏳ ADR-0001 (استكمال الوثيقة)
+7. ⏳ git tag v1.0-backend-freeze
+8. ⏳ Frontend v1
+```
+
+### Backend v1 — ما تبقى
+
+```text
+Backend v1
+├── Phase 8.5.5 Reports
+│   ├── 8.5.5.1 Organizer Reports (Sales, Revenue, Attendance, Commission)
+│   ├── 8.5.5.2 Admin Reports (Platform Revenue, Monthly Commission, Top Venues/Events, Payment Methods, Refunds)
+│   └── 8.5.5.3 Export + OpenAPI + Tests + Architecture Guards
+├── Phase 8.6 Organizer Dashboard
+│   └── GET /api/tenant/organizer/dashboard (endpoint رئيسي واحد)
+├── Phase 8.7 Admin Dashboard
+│   └── KPIs + آخر الأحداث + المدفوعات + Top Venues/Events + تنبيهات
+├── Backend Freeze Checklist
+├── ADR-0001 Backend v1 Freeze (استكمال)
+└── v1.0-backend-freeze (Git Tag)
+```
+
+#### Phase 8.5.5 — Reports (Done عندما…)
+
+- جميع التقارير تعمل بـ `from` / `to`.
+- **لا** كتابة في قاعدة البيانات (قراءة فقط).
+- البيانات من الخدمات/الجداول الحالية (`SettlementSummaryService`, `orders`, `tickets`, `settlement_entries`, `commission_payments`, …).
+- اختبارات تغطي صحة الأرقام للفترات الزمنية المختلفة.
+- كل دفعة = commit مستقل (8.5.5.1 → 8.5.5.2 → 8.5.5.3).
+
+#### Phase 8.6 — Organizer Dashboard (Done عندما…)
+
+- `GET /api/tenant/organizer/dashboard` — endpoint رئيسي يغذي الشاشة دون 10 طلبات.
+- Endpoints فرعية فقط عند الحاجة.
+- لا N+1؛ pagination للقوائم.
+
+**شكل الاستجابة المستهدف:**
+
+```json
+{
+  "today": { "sales": "...", "tickets_sold": 0, "check_ins": 0 },
+  "overview": { "gross_sales": "...", "net_revenue": "...", "remaining_tickets": 0, "pending_commission": "..." },
+  "recent_orders": [],
+  "recent_check_ins": [],
+  "top_events": []
+}
+```
+
+#### Phase 8.7 — Admin Dashboard (Done عندما…)
+
+- KPIs، آخر الأحداث، آخر المدفوعات، أعلى المنظمين/الفعاليات.
+- تنبيهات (Outstanding Commission، Events Today، …).
+- لا N+1؛ pagination للقوائم.
+
+### سياسة Freeze Backend v1
+
+| مسموح بعد الـ Tag | ممنوع (إلا بطلب عميل فعلي) |
+|---|---|
+| Bug fixes | إعادة تصميم Domain |
+| تحسينات صغيرة | جداول / Ledger جديد |
+| تعديل Response بسيط | ميزات "للمستقبل" |
+
+### Backend Freeze Checklist (إلزامية قبل `git tag`)
+
+```text
+Domain
+☑ Payments
+☑ Orders
+☑ Ticketing
+☑ Check-in
+☑ Settlement
+
+Architecture
+☐ Architecture Guards
+☐ ADR-0001 محدثة
+☐ OpenAPI محدثة
+
+Quality
+☐ جميع الاختبارات ناجحة
+☐ Laravel Pint
+☐ لا TODO/FIXME حرجة
+☐ (اختياري) PHPStan/Psalm
+
+Performance
+☐ لا N+1 في Dashboard APIs
+☐ Pagination لكل القوائم
+☐ Indexes للجداول الجديدة
+
+Security
+☐ Authorization
+☐ Rate Limiting
+☐ Validation
+☐ Audit Logs
+
+Operations
+☐ Queue
+☐ Scheduler
+☐ Mail
+☐ Storage
+```
+
+عند اكتمال القائمة → `git tag v1.0-backend-freeze` → `git push origin v1.0-backend-freeze`.
+
+### Frontend v1 (مشروع مستقل بعد الـ Freeze)
+
+```text
+Frontend v1
+├── Sprint 1 — Public Website (Landing, Event List, Event Details)
+├── Sprint 2 — Checkout (Checkout, Payment, Ticket Download)
+├── Sprint 3 — Organizer Dashboard
+├── Sprint 4 — Admin Dashboard
+└── Sprint 5 — Scanner PWA (Scan QR, Result states)
+```
+
+**Organizer Panel (هدف):** Dashboard, Events, Ticket Types, Orders, Customers, Check-ins, Reports, Settlement, Settings.
+
+**Admin Panel (هدف):** Dashboard, Users, Venues, Events, Payments, Settlement, Analytics, Logs, Permissions.
+
+**ملاحظة:** يمكن البدء بتصميم الواجهات بالتوازي (Mock data) — لا تنتظر اكتمال كل الـ APIs.
+
+### Production (بعد Frontend)
+
+```text
+Production
+├── Docker
+├── Queue / Horizon / Supervisor / Redis
+├── S3 + CDN
+├── Monitoring + Logging + Backup
+├── Rate Limiting + Security
+├── CI/CD + VPS + SSL
+└── Pilot Event (أول فعالية حقيقية)
+```
+
+### Pilot Event — اختبار القبول (قبل أول عميل)
+
+دورة كاملة **بدون تدخل يدوي في DB:**
+
+1. إنشاء Venue → 2. Event → 3. Ticket Types → 4. شراء تذكرة → 5. التحقق من الدفع → 6. إصدار التذكرة → 7. QR → 8. PDF → 9. Email → 10. تنزيل التذكرة → 11. Check-in → 12. Settlement → 13. تسجيل استلام العمولة → 14. Reports.
+
+### Commits مكتملة (Backend — مرجع)
+
+| Commit | المرحلة |
+|---|---|
+| `8de9868` | 8.5.1 — Commission receivable ledger |
+| `1a45b86` | 8.5.3 — Manual commission payments |
+| `d1fab6a` | 8.5.4 — Settlement read APIs |
 
 ---
 
@@ -2748,8 +2927,18 @@ Domain & Authorization (§1.1)
   ☑ Phase 7.9 — Cleanup: webhook infra + hosted-checkout legacy + complete/fail endpoints removed (§7.9)
   ☑ Phase 7.10 — API Syria live HTTP integration + apisyria:probe command
   ☑ Phase 7.11 — Multi-tenant payment_accounts + PaymentAccountResolver
-☐ Phase 8  — Notifications (Email/SMS/Templates, Outbox Worker, Audit)
-☐ Phase 9  — Production Hardening
+☑ Phase 8  — Ticket Lifecycle & Financial Layer (8.1–8.5.4)
+  ☑ Phase 8.3 — QR / PDF / Email artifacts
+  ☑ Phase 8.4 — Check-in
+  ☑ Phase 8.5.1 — Commission receivable ledger
+  ☑ Phase 8.5.3 — Manual commission payments
+  ☑ Phase 8.5.4 — Settlement read APIs
+  ☐ Phase 8.5.5 — Reports (8.5.5.1 → 8.5.5.3)
+  ☐ Phase 8.6 — Organizer Dashboard API
+  ☐ Phase 8.7 — Admin Dashboard API
+  ☐ Backend Freeze Checklist + ADR-0001 + tag v1.0-backend-freeze
+☐ Phase 9  — Frontend v1 (Organizer / Admin / Public / Scanner PWA)
+☐ Phase 10 — Production Hardening + Pilot Event
 
 <!-- مرجع granular (§1.3 / §2) — للتفاصيل per-entity -->
 <!--
