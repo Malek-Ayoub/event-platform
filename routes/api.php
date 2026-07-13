@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\CommissionPaymentController;
+use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AdminSettlementController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CommissionPaymentController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\PlatformSettingController;
 use Illuminate\Support\Facades\Route;
@@ -64,4 +65,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function (): void {
 
     Route::get('reports', [AdminReportController::class, 'show'])
         ->name('admin.reports.show');
+
+    Route::get('dashboard', [AdminDashboardController::class, 'show'])
+        ->name('admin.dashboard.show');
 });

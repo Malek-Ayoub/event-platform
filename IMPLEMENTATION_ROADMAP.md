@@ -21,9 +21,9 @@
 | Ticket Issuance, QR, PDF, Email | ✅ |
 | Check-in | ✅ |
 | Commission Ledger + Settlement Read APIs (8.5.1–8.5.4) | ✅ |
-| Reports (8.5.5) | ⏳ |
-| Organizer Dashboard API (8.6) | ⏳ |
-| Admin Dashboard API (8.7) | ⏳ |
+| Reports (8.5.5) | ✅ |
+| Organizer Dashboard API (8.6) | ✅ |
+| Admin Dashboard API (8.7) | ✅ |
 | Frontend | ⏳ |
 | Production | ⏳ |
 
@@ -36,8 +36,10 @@
    - ✅ 8.5.5.1 Organizer Reports
    - ✅ 8.5.5.2 Admin Reports
    - ✅ 8.5.5.3 OpenAPI + Architecture Guards + Tests
-3. ⏳ 8.6 Organizer Dashboard API
-4. ⏳ 8.7 Admin Dashboard API
+3. ✅ 8.6 Organizer Dashboard API
+   - ✅ 8.6.1 Dashboard Overview (`GET /api/tenant/organizer/dashboard`)
+4. ✅ 8.7 Admin Dashboard API
+   - ✅ 8.7.1 Dashboard Overview (`GET /api/admin/dashboard`)
 5. ⏳ Backend Freeze Checklist
 6. ⏳ ADR-0001 (استكمال الوثيقة)
 7. ⏳ git tag v1.0-backend-freeze
@@ -55,7 +57,7 @@ Backend v1
 ├── Phase 8.6 Organizer Dashboard
 │   └── GET /api/tenant/organizer/dashboard (endpoint رئيسي واحد)
 ├── Phase 8.7 Admin Dashboard
-│   └── KPIs + آخر الأحداث + المدفوعات + Top Venues/Events + تنبيهات
+│   └── GET /api/admin/dashboard (KPIs + today + top lists + latest activity + alerts)
 ├── Backend Freeze Checklist
 ├── ADR-0001 Backend v1 Freeze (استكمال)
 └── v1.0-backend-freeze (Git Tag)
@@ -89,9 +91,9 @@ Backend v1
 
 #### Phase 8.7 — Admin Dashboard (Done عندما…)
 
-- KPIs، آخر الأحداث، آخر المدفوعات، أعلى المنظمين/الفعاليات.
-- تنبيهات (Outstanding Commission، Events Today، …).
-- لا N+1؛ pagination للقوائم.
+- `GET /api/admin/dashboard` — Super Admin فقط؛ composition layer قراءة فقط.
+- KPIs (إيراد المنصة، عمولات، أحداث/منظمين نشطين)، today widgets، top venues/events (`limit=5`)، آخر الطلبات/المدفوعات/check-ins، تنبيهات (outstanding commission، events today، failed verifications 24h).
+- `AdminDashboardReadArchitectureGuardTest` + OpenAPI + اختبارات منصة فارغة وقيم `0`/`[]`.
 
 ### سياسة Freeze Backend v1
 
@@ -2937,8 +2939,8 @@ Domain & Authorization (§1.1)
   ☑ Phase 8.5.3 — Manual commission payments
   ☑ Phase 8.5.4 — Settlement read APIs
   ✅ Phase 8.5.5 — Reports (closed)
-  ☐ Phase 8.6 — Organizer Dashboard API
-  ☐ Phase 8.7 — Admin Dashboard API
+  ✅ Phase 8.6 — Organizer Dashboard API (8.6.1 overview)
+  ✅ Phase 8.7 — Admin Dashboard API (8.7.1 overview)
   ☐ Backend Freeze Checklist + ADR-0001 + tag v1.0-backend-freeze
 ☐ Phase 9  — Frontend v1 (Organizer / Admin / Public / Scanner PWA)
 ☐ Phase 10 — Production Hardening + Pilot Event
