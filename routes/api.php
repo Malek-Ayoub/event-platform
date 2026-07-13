@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CommissionPaymentController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\PlatformSettingController;
 use Illuminate\Support\Facades\Route;
@@ -48,4 +49,9 @@ Route::prefix('auth')->group(function (): void {
 Route::middleware('auth:sanctum')->prefix('platform')->group(function (): void {
     Route::get('settings', [PlatformSettingController::class, 'show'])->name('platform.settings.show');
     Route::put('settings', [PlatformSettingController::class, 'update'])->name('platform.settings.update');
+});
+
+Route::middleware('auth:sanctum')->prefix('admin')->group(function (): void {
+    Route::post('commission-payments', [CommissionPaymentController::class, 'store'])
+        ->name('admin.commission-payments.store');
 });

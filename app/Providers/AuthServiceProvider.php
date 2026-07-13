@@ -9,6 +9,7 @@ use App\Models\EmailTemplate;
 use App\Models\Event;
 use App\Models\Notification;
 use App\Models\Order;
+use App\Models\CommissionPayment;
 use App\Models\PaymentTransaction;
 use App\Models\PlatformSetting;
 use App\Models\Product;
@@ -24,6 +25,7 @@ use App\Models\UserPermission;
 use App\Models\Venue;
 use App\Policies\ActivityLogPolicy;
 use App\Policies\CategoryPolicy;
+use App\Policies\CommissionPaymentPolicy;
 use App\Policies\CouponPolicy;
 use App\Policies\EventPolicy;
 use App\Policies\NotificationPolicy;
@@ -66,6 +68,7 @@ class AuthServiceProvider extends ServiceProvider
         Order::class => OrderPolicy::class,
         PaymentTransaction::class => PaymentTransactionPolicy::class,
         Refund::class => RefundPolicy::class,
+        CommissionPayment::class => CommissionPaymentPolicy::class,
         PlatformSetting::class => PlatformSettingPolicy::class,
         Notification::class => NotificationPolicy::class,
         EmailTemplate::class => TemplatePolicy::class,

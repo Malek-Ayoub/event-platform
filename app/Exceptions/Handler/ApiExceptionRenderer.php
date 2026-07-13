@@ -100,6 +100,7 @@ class ApiExceptionRenderer
             || str_starts_with($class, 'App\\Exceptions\\Payments\\')
             || str_starts_with($class, 'App\\Exceptions\\Refunds\\')
             || str_starts_with($class, 'App\\Exceptions\\Commissions\\')
+            || str_starts_with($class, 'App\\Exceptions\\Settlements\\')
             || str_starts_with($class, 'App\\Exceptions\\Events\\')
             || str_starts_with($class, 'App\\Exceptions\\Tickets\\')
             || str_starts_with($class, 'App\\Exceptions\\PlatformSettings\\')

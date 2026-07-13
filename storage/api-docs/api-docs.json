@@ -16,6 +16,77 @@
         }
     ],
     "paths": {
+        "/api/admin/commission-payments": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Record commission received from an organizer",
+                "operationId": "admin.commission-payments.store",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordCommissionPaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Commission payment recorded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CommissionPaymentResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/health": {
             "get": {
                 "tags": [
@@ -3836,6 +3907,57 @@
                 },
                 "type": "object"
             },
+            "RecordCommissionPaymentRequest": {
+                "required": [
+                    "venue_id",
+                    "amount",
+                    "payment_method",
+                    "received_at"
+                ],
+                "properties": {
+                    "venue_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "amount": {
+                        "type": "string",
+                        "example": "20.00"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "USD",
+                        "maxLength": 3,
+                        "minLength": 3
+                    },
+                    "payment_method": {
+                        "type": "string",
+                        "enum": [
+                            "cash",
+                            "shamcash",
+                            "syriatel_cash",
+                            "bank_transfer",
+                            "other"
+                        ]
+                    },
+                    "reference_number": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "payment_account_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "notes": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "RegisterRequest": {
                 "required": [
                     "name",
@@ -3970,6 +4092,66 @@
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "CommissionPaymentResource": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "venue_id": {
+                        "type": "integer"
+                    },
+                    "payment_account_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "amount": {
+                        "type": "string",
+                        "example": "20.00"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "USD"
+                    },
+                    "payment_method": {
+                        "type": "string",
+                        "enum": [
+                            "cash",
+                            "shamcash",
+                            "syriatel_cash",
+                            "bank_transfer",
+                            "other"
+                        ]
+                    },
+                    "reference_number": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "received_by_user_id": {
+                        "type": "integer"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "outstanding_commission": {
+                        "type": "string",
+                        "example": "10.00"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
                     }
                 },
                 "type": "object"
@@ -4609,6 +4791,10 @@
         {
             "name": "Platform",
             "description": "Tax rates (tenant-scoped) and platform settings (global, super admin)"
+        },
+        {
+            "name": "Admin",
+            "description": "Admin"
         },
         {
             "name": "Tickets",

@@ -7,6 +7,7 @@ use App\Models\CommissionAdjustment;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
 use App\Models\Refund;
+use App\Models\CommissionPayment;
 use App\Models\SettlementEntry;
 use App\Support\Concerns\BelongsToVenue;
 use App\Support\Concerns\HasOptimisticLock;
@@ -26,6 +27,7 @@ class FinancialDomainArchitectureTest extends TestCase
         Commission::class,
         CommissionAdjustment::class,
         SettlementEntry::class,
+        CommissionPayment::class,
     ];
 
     #[Test]

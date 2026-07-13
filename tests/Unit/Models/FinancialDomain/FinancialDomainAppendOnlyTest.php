@@ -4,6 +4,7 @@ namespace Tests\Unit\Models\FinancialDomain;
 
 use App\Models\Commission;
 use App\Models\CommissionAdjustment;
+use App\Models\CommissionPayment;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\SettlementEntry;
@@ -24,6 +25,7 @@ class FinancialDomainAppendOnlyTest extends TestCase
         Commission::class,
         CommissionAdjustment::class,
         SettlementEntry::class,
+        CommissionPayment::class,
     ];
 
     #[Test]
@@ -32,6 +34,7 @@ class FinancialDomainAppendOnlyTest extends TestCase
         $this->assertNull(Commission::UPDATED_AT);
         $this->assertNull(CommissionAdjustment::UPDATED_AT);
         $this->assertNull(SettlementEntry::UPDATED_AT);
+        $this->assertNull(CommissionPayment::UPDATED_AT);
     }
 
     #[Test]
@@ -40,6 +43,7 @@ class FinancialDomainAppendOnlyTest extends TestCase
         $this->assertFalse(Schema::hasColumn('commissions', 'updated_at'));
         $this->assertFalse(Schema::hasColumn('commission_adjustments', 'updated_at'));
         $this->assertFalse(Schema::hasColumn('settlement_entries', 'updated_at'));
+        $this->assertFalse(Schema::hasColumn('commission_payments', 'updated_at'));
         $this->assertTrue(Schema::hasColumn('commissions', 'created_at'));
         $this->assertTrue(Schema::hasColumn('commission_adjustments', 'created_at'));
         $this->assertTrue(Schema::hasColumn('settlement_entries', 'created_at'));

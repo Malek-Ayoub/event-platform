@@ -3,6 +3,7 @@
 namespace App\Services\Settlements;
 
 use App\Enums\FinancialDomain\SettlementEntryDirection;
+use App\Models\Scopes\BelongsToVenueScope;
 use App\Models\SettlementEntry;
 use App\Services\Settlements\Data\AppendSettlementEntryData;
 use App\Services\TransactionRunner;
@@ -22,7 +23,7 @@ class SettlementEntryService
     public function append(AppendSettlementEntryData $data): SettlementEntry
     {
         return $this->transactionRunner->run(function () use ($data): SettlementEntry {
-            $existing = SettlementEntry::query()
+            $existing = $this->venueEntryQuery($data->venueId)
                 ->where('reference_type', $data->referenceType)
                 ->where('reference_id', $data->referenceId)
                 ->lockForUpdate()
@@ -36,24 +37,26 @@ class SettlementEntryService
             $balanceAfter = $this->applyDirection($previousBalance, $data->direction, $data->amount);
 
             try {
-                return SettlementEntry::query()->create([
-                    'venue_id' => $data->venueId,
-                    'event_id' => $data->eventId,
-                    'payment_transaction_id' => $data->paymentTransactionId,
-                    'order_id' => $data->orderId,
-                    'type' => $data->type,
-                    'direction' => $data->direction,
-                    'amount' => $this->formatAmount($data->amount),
-                    'currency' => $data->currency,
-                    'reference_type' => $data->referenceType,
-                    'reference_id' => $data->referenceId,
-                    'balance_after' => $balanceAfter,
-                    'correlation_id' => $data->correlationId,
-                    'metadata' => $data->metadata,
-                    'occurred_at' => $data->occurredAt,
-                ]);
-            } catch (QueryException) {
                 return SettlementEntry::query()
+                    ->withoutGlobalScope(BelongsToVenueScope::class)
+                    ->create([
+                        'venue_id' => $data->venueId,
+                        'event_id' => $data->eventId,
+                        'payment_transaction_id' => $data->paymentTransactionId,
+                        'order_id' => $data->orderId,
+                        'type' => $data->type,
+                        'direction' => $data->direction,
+                        'amount' => $this->formatAmount($data->amount),
+                        'currency' => $data->currency,
+                        'reference_type' => $data->referenceType,
+                        'reference_id' => $data->referenceId,
+                        'balance_after' => $balanceAfter,
+                        'correlation_id' => $data->correlationId,
+                        'metadata' => $data->metadata,
+                        'occurred_at' => $data->occurredAt,
+                    ]);
+            } catch (QueryException) {
+                return $this->venueEntryQuery($data->venueId)
                     ->where('reference_type', $data->referenceType)
                     ->where('reference_id', $data->referenceId)
                     ->firstOrFail();
@@ -61,15 +64,36 @@ class SettlementEntryService
         });
     }
 
+    public function outstandingBalanceForVenue(int $venueId): string
+    {
+        return $this->latestVenueBalance($venueId);
+    }
+
+    public function ledgerCurrencyForVenue(int $venueId): ?string
+    {
+        return $this->venueEntryQuery($venueId)
+            ->orderByDesc('id')
+            ->value('currency');
+    }
+
     private function latestVenueBalance(int $venueId): string
     {
-        $latest = SettlementEntry::query()
-            ->where('venue_id', $venueId)
+        $latest = $this->venueEntryQuery($venueId)
             ->orderByDesc('id')
             ->lockForUpdate()
             ->value('balance_after');
 
         return $this->formatAmount($latest ?? '0.00');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<SettlementEntry>
+     */
+    private function venueEntryQuery(int $venueId)
+    {
+        return SettlementEntry::query()
+            ->withoutGlobalScope(BelongsToVenueScope::class)
+            ->where('venue_id', $venueId);
     }
 
     private function applyDirection(string $previousBalance, SettlementEntryDirection $direction, string $amount): string

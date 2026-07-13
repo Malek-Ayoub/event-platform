@@ -13,8 +13,8 @@ readonly class AppendSettlementEntryData
      */
     public function __construct(
         public int $venueId,
-        public int $eventId,
-        public int $orderId,
+        public ?int $eventId,
+        public ?int $orderId,
         public SettlementEntryType $type,
         public SettlementEntryDirection $direction,
         public string $amount,
