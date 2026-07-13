@@ -49,6 +49,7 @@ class TopEventsQuery
             ->selectRaw('COALESCE(order_totals.gross_sales, 0) as gross_sales')
             ->selectRaw('COALESCE(ticket_totals.tickets_sold, 0) as tickets_sold')
             ->orderByDesc('gross_sales')
+            ->orderBy('events.id')
             ->limit($limit)
             ->get();
 

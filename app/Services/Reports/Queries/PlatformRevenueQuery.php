@@ -4,8 +4,6 @@ namespace App\Services\Reports\Queries;
 
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Enums\OrdersDomain\TicketStatus;
-use App\Models\Order;
-use App\Models\Ticket;
 use App\Services\Reports\Queries\Concerns\AppliesReportDateRange;
 use App\Services\Settlements\Data\SettlementDateRange;
 use Illuminate\Support\Facades\DB;
@@ -40,9 +38,9 @@ class PlatformRevenueQuery
 
         $this->applyDateRange($activeVenuesQuery, 'updated_at', $range);
 
-        $currency = Order::query()
-            ->join('payment_transactions', 'payment_transactions.order_id', '=', 'orders.id')
-            ->whereIn('orders.status', [OrderStatus::Paid, OrderStatus::Refunded])
+        $currency = DB::table('payment_transactions')
+            ->join('orders', 'orders.id', '=', 'payment_transactions.order_id')
+            ->whereIn('orders.status', [OrderStatus::Paid->value, OrderStatus::Refunded->value])
             ->orderByDesc('orders.id')
             ->value('payment_transactions.currency');
 

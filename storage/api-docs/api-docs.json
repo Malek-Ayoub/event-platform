@@ -94,32 +94,39 @@
                     "Reports"
                 ],
                 "summary": "Platform operational and financial report",
+                "description": "Read-only platform-wide report for super administrators. Aggregates revenue, commissions, top venues/events, payment methods, and refunds.",
                 "operationId": "admin.reports.show",
                 "parameters": [
                     {
                         "name": "from",
                         "in": "query",
+                        "description": "Inclusive start date (applied as start of day).",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2026-01-01"
                         }
                     },
                     {
                         "name": "to",
                         "in": "query",
+                        "description": "Inclusive end date (applied as end of day). Must be on or after `from`.",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2026-01-31"
                         }
                     },
                     {
                         "name": "limit",
                         "in": "query",
+                        "description": "Maximum rows returned for `top_venues` and `top_events` (default 10, max 100).",
                         "required": false,
                         "schema": {
                             "type": "integer",
+                            "example": 10,
                             "default": 10,
                             "maximum": 100,
                             "minimum": 1
@@ -170,6 +177,68 @@
                                         }
                                     },
                                     "type": "object"
+                                },
+                                "example": {
+                                    "data": {
+                                        "platform": {
+                                            "gross_revenue": "50000.00",
+                                            "net_revenue": "47500.00",
+                                            "orders_count": 320,
+                                            "tickets_sold": 640,
+                                            "active_venues": 12
+                                        },
+                                        "commissions": {
+                                            "commission_due": "5000.00",
+                                            "commission_paid": "2500.00",
+                                            "commission_adjustments": "150.00",
+                                            "outstanding_commission": "2350.00",
+                                            "monthly": [
+                                                {
+                                                    "month": "2026-01",
+                                                    "commission_due": "1200.00",
+                                                    "commission_paid": "800.00"
+                                                }
+                                            ]
+                                        },
+                                        "top_venues": [
+                                            {
+                                                "venue_id": 1,
+                                                "venue_name": "Alpha Venue",
+                                                "subdomain": "alpha",
+                                                "gross_sales": "20000.00",
+                                                "commission_due": "2000.00",
+                                                "outstanding_commission": "500.00"
+                                            }
+                                        ],
+                                        "top_events": [
+                                            {
+                                                "event_id": 10,
+                                                "event_name": "Summer Festival",
+                                                "venue_id": 1,
+                                                "venue_name": "Alpha Venue",
+                                                "gross_sales": "8000.00",
+                                                "tickets_sold": 400
+                                            }
+                                        ],
+                                        "payment_methods": [
+                                            {
+                                                "method": "shamcash",
+                                                "transactions_count": 180,
+                                                "total_amount": "30000.00"
+                                            }
+                                        ],
+                                        "refunds": {
+                                            "refunds_count": 8,
+                                            "refunded_amount": "2500.00",
+                                            "refund_rate": "5.00"
+                                        },
+                                        "meta": {
+                                            "from": "2026-01-01T00:00:00+00:00",
+                                            "to": "2026-01-31T23:59:59+00:00",
+                                            "currency": "USD",
+                                            "limit": 10
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -190,6 +259,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
                                 }
                             }
                         }
@@ -3143,32 +3222,39 @@
                     "Reports"
                 ],
                 "summary": "Organizer operational and financial report",
+                "description": "Read-only venue report aggregating sales, revenue, attendance, and commission metrics. Supports optional date range and event filters.",
                 "operationId": "tenant.organizer.reports.show",
                 "parameters": [
                     {
                         "name": "from",
                         "in": "query",
+                        "description": "Inclusive start date (venue timezone applied as start of day).",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2026-01-01"
                         }
                     },
                     {
                         "name": "to",
                         "in": "query",
+                        "description": "Inclusive end date (applied as end of day). Must be on or after `from`.",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2026-01-31"
                         }
                     },
                     {
                         "name": "event_id",
                         "in": "query",
+                        "description": "Optional event scope within the current venue.",
                         "required": false,
                         "schema": {
                             "type": "integer",
+                            "example": 12,
                             "minimum": 1
                         }
                     }
@@ -3202,6 +3288,37 @@
                                         }
                                     },
                                     "type": "object"
+                                },
+                                "example": {
+                                    "data": {
+                                        "sales": {
+                                            "gross_sales": "1250.00",
+                                            "orders_count": 42,
+                                            "tickets_sold": 80,
+                                            "average_order_value": "29.76"
+                                        },
+                                        "revenue": {
+                                            "gross_revenue": "1250.00",
+                                            "refunded_amount": "50.00",
+                                            "net_revenue": "1200.00"
+                                        },
+                                        "attendance": {
+                                            "tickets_issued": 80,
+                                            "checked_in": 60,
+                                            "attendance_rate": "75.00"
+                                        },
+                                        "commission": {
+                                            "commission_due": "125.00",
+                                            "commission_paid": "50.00",
+                                            "outstanding_commission": "75.00"
+                                        },
+                                        "meta": {
+                                            "from": "2026-01-01T00:00:00+00:00",
+                                            "to": "2026-01-31T23:59:59+00:00",
+                                            "currency": "USD",
+                                            "event_id": null
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3232,6 +3349,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
                                 }
                             }
                         }

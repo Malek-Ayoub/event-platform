@@ -61,6 +61,7 @@ class TopVenuesQuery
             ->selectRaw('COALESCE(commission_due_totals.commission_due, 0) as commission_due')
             ->selectRaw('COALESCE(outstanding_totals.outstanding_commission, 0) as outstanding_commission')
             ->orderByDesc('gross_sales')
+            ->orderBy('venues.id')
             ->limit($limit)
             ->get();
 

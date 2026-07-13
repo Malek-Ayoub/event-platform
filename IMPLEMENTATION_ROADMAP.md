@@ -32,10 +32,10 @@
 ```text
 0. ✅ تحديث IMPLEMENTATION_ROADMAP.md
 1. ✅ إنشاء docs/adr/
-2. ⏳ 8.5.5 Reports
+2. ✅ 8.5.5 Reports
    - ✅ 8.5.5.1 Organizer Reports
    - ✅ 8.5.5.2 Admin Reports
-   - ☐ 8.5.5.3 Export + OpenAPI + Tests + Architecture Guards
+   - ✅ 8.5.5.3 OpenAPI + Architecture Guards + Tests
 3. ⏳ 8.6 Organizer Dashboard API
 4. ⏳ 8.7 Admin Dashboard API
 5. ⏳ Backend Freeze Checklist
@@ -2938,7 +2938,7 @@ Domain & Authorization (§1.1)
   ☑ Phase 8.5.4 — Settlement read APIs
   ⏳ Phase 8.5.5 — Reports
   ☑ Phase 8.5.5.1 — Organizer Reports
-  ☐ Phase 8.5.5.2 — Admin Reports
+  ☑ Phase 8.5.5.2 — Admin Reports
   ☐ Phase 8.5.5.3 — Export + OpenAPI guards
   ☐ Phase 8.6 — Organizer Dashboard API
   ☐ Phase 8.7 — Admin Dashboard API
