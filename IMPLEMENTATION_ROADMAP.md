@@ -33,6 +33,9 @@
 0. ✅ تحديث IMPLEMENTATION_ROADMAP.md
 1. ✅ إنشاء docs/adr/
 2. ⏳ 8.5.5 Reports
+   - ⏳ 8.5.5.1 Organizer Reports
+   - ☐ 8.5.5.2 Admin Reports
+   - ☐ 8.5.5.3 Export + OpenAPI + Tests + Architecture Guards
 3. ⏳ 8.6 Organizer Dashboard API
 4. ⏳ 8.7 Admin Dashboard API
 5. ⏳ Backend Freeze Checklist

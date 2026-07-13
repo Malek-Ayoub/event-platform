@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\TaxRateController;
+use App\Http\Controllers\Api\OrganizerReportController;
 use App\Http\Controllers\Api\OrganizerSettlementController;
 use App\Http\Controllers\Api\TicketCheckInController;
 use App\Http\Controllers\Api\TicketTypeController;
@@ -111,5 +112,8 @@ Route::prefix('tenant')->group(function (): void {
             Route::get('entries', [OrganizerSettlementController::class, 'entries'])
                 ->name('tenant.organizer.settlement.entries');
         });
+
+        Route::get('organizer/reports', [OrganizerReportController::class, 'show'])
+            ->name('tenant.organizer.reports.show');
     });
 });
