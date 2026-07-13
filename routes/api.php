@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CommissionPaymentController;
+use App\Http\Controllers\Api\AdminSettlementController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\PlatformSettingController;
 use Illuminate\Support\Facades\Route;
@@ -54,4 +55,9 @@ Route::middleware('auth:sanctum')->prefix('platform')->group(function (): void {
 Route::middleware('auth:sanctum')->prefix('admin')->group(function (): void {
     Route::post('commission-payments', [CommissionPaymentController::class, 'store'])
         ->name('admin.commission-payments.store');
+
+    Route::get('settlement/venues', [AdminSettlementController::class, 'venues'])
+        ->name('admin.settlement.venues.index');
+    Route::get('venues/{venue}/settlement', [AdminSettlementController::class, 'venueSettlement'])
+        ->name('admin.venues.settlement.show');
 });

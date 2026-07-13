@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\TaxRateController;
+use App\Http\Controllers\Api\OrganizerSettlementController;
 use App\Http\Controllers\Api\TicketCheckInController;
 use App\Http\Controllers\Api\TicketTypeController;
 use Illuminate\Support\Facades\Route;
@@ -103,5 +104,12 @@ Route::prefix('tenant')->group(function (): void {
         Route::delete('tax-rates/{taxRate}', [TaxRateController::class, 'destroy'])->name('tenant.tax-rates.destroy');
 
         Route::post('tickets/check-in', [TicketCheckInController::class, 'store'])->name('tenant.tickets.check-in');
+
+        Route::prefix('organizer/settlement')->group(function (): void {
+            Route::get('summary', [OrganizerSettlementController::class, 'summary'])
+                ->name('tenant.organizer.settlement.summary');
+            Route::get('entries', [OrganizerSettlementController::class, 'entries'])
+                ->name('tenant.organizer.settlement.entries');
+        });
     });
 });
