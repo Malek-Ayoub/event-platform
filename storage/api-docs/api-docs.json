@@ -87,6 +87,121 @@
                 ]
             }
         },
+        "/api/admin/reports": {
+            "get": {
+                "tags": [
+                    "Admin",
+                    "Reports"
+                ],
+                "summary": "Platform operational and financial report",
+                "operationId": "admin.reports.show",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Admin platform report",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "platform": {
+                                                    "$ref": "#/components/schemas/AdminReportPlatform"
+                                                },
+                                                "commissions": {
+                                                    "$ref": "#/components/schemas/AdminReportCommissions"
+                                                },
+                                                "top_venues": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/AdminReportTopVenue"
+                                                    }
+                                                },
+                                                "top_events": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/AdminReportTopEvent"
+                                                    }
+                                                },
+                                                "payment_methods": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/AdminReportPaymentMethod"
+                                                    }
+                                                },
+                                                "refunds": {
+                                                    "$ref": "#/components/schemas/AdminReportRefunds"
+                                                },
+                                                "meta": {
+                                                    "$ref": "#/components/schemas/AdminReportMeta"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/admin/settlement/venues": {
             "get": {
                 "tags": [
@@ -4575,6 +4690,175 @@
                 },
                 "type": "object"
             },
+            "AdminReportPlatform": {
+                "properties": {
+                    "gross_revenue": {
+                        "type": "string",
+                        "example": "50000.00"
+                    },
+                    "net_revenue": {
+                        "type": "string",
+                        "example": "47500.00"
+                    },
+                    "orders_count": {
+                        "type": "integer",
+                        "example": 320
+                    },
+                    "tickets_sold": {
+                        "type": "integer",
+                        "example": 640
+                    },
+                    "active_venues": {
+                        "type": "integer",
+                        "example": 12
+                    }
+                },
+                "type": "object"
+            },
+            "AdminReportCommissions": {
+                "properties": {
+                    "commission_due": {
+                        "type": "string",
+                        "example": "5000.00"
+                    },
+                    "commission_paid": {
+                        "type": "string",
+                        "example": "2500.00"
+                    },
+                    "commission_adjustments": {
+                        "type": "string",
+                        "example": "150.00"
+                    },
+                    "outstanding_commission": {
+                        "type": "string",
+                        "example": "2350.00"
+                    },
+                    "monthly": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "month": {
+                                    "type": "string",
+                                    "example": "2026-01"
+                                },
+                                "commission_due": {
+                                    "type": "string",
+                                    "example": "1200.00"
+                                },
+                                "commission_paid": {
+                                    "type": "string",
+                                    "example": "800.00"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "AdminReportTopVenue": {
+                "properties": {
+                    "venue_id": {
+                        "type": "integer"
+                    },
+                    "venue_name": {
+                        "type": "string"
+                    },
+                    "subdomain": {
+                        "type": "string"
+                    },
+                    "gross_sales": {
+                        "type": "string"
+                    },
+                    "commission_due": {
+                        "type": "string"
+                    },
+                    "outstanding_commission": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "AdminReportTopEvent": {
+                "properties": {
+                    "event_id": {
+                        "type": "integer"
+                    },
+                    "event_name": {
+                        "type": "string"
+                    },
+                    "venue_id": {
+                        "type": "integer"
+                    },
+                    "venue_name": {
+                        "type": "string"
+                    },
+                    "gross_sales": {
+                        "type": "string"
+                    },
+                    "tickets_sold": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "AdminReportPaymentMethod": {
+                "properties": {
+                    "method": {
+                        "type": "string",
+                        "example": "shamcash"
+                    },
+                    "transactions_count": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "total_amount": {
+                        "type": "string",
+                        "example": "12500.00"
+                    }
+                },
+                "type": "object"
+            },
+            "AdminReportRefunds": {
+                "properties": {
+                    "refunds_count": {
+                        "type": "integer",
+                        "example": 8
+                    },
+                    "refunded_amount": {
+                        "type": "string",
+                        "example": "2500.00"
+                    },
+                    "refund_rate": {
+                        "type": "string",
+                        "example": "5.00"
+                    }
+                },
+                "type": "object"
+            },
+            "AdminReportMeta": {
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "USD"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "example": 10
+                    }
+                },
+                "type": "object"
+            },
             "ApiTokenResource": {
                 "properties": {
                     "user": {
@@ -5552,12 +5836,12 @@
             "description": "Admin"
         },
         {
-            "name": "Settlement",
-            "description": "Settlement"
-        },
-        {
             "name": "Reports",
             "description": "Reports"
+        },
+        {
+            "name": "Settlement",
+            "description": "Settlement"
         },
         {
             "name": "Tickets",

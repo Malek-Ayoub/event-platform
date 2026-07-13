@@ -10,6 +10,13 @@ class ReportsReadArchitectureGuardTest extends TestCase
     /** @var list<string> */
     private array $readServices = [
         'app/Services/Reports/OrganizerReportService.php',
+        'app/Services/Reports/AdminReportService.php',
+        'app/Services/Reports/Queries/PlatformRevenueQuery.php',
+        'app/Services/Reports/Queries/CommissionReportQuery.php',
+        'app/Services/Reports/Queries/TopVenuesQuery.php',
+        'app/Services/Reports/Queries/TopEventsQuery.php',
+        'app/Services/Reports/Queries/PaymentMethodReportQuery.php',
+        'app/Services/Reports/Queries/RefundReportQuery.php',
     ];
 
     #[Test]

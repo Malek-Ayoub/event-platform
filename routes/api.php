@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CommissionPaymentController;
+use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AdminSettlementController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\PlatformSettingController;
@@ -60,4 +61,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function (): void {
         ->name('admin.settlement.venues.index');
     Route::get('venues/{venue}/settlement', [AdminSettlementController::class, 'venueSettlement'])
         ->name('admin.venues.settlement.show');
+
+    Route::get('reports', [AdminReportController::class, 'show'])
+        ->name('admin.reports.show');
 });
