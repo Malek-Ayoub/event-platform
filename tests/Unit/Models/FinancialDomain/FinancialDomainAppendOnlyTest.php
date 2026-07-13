@@ -6,6 +6,7 @@ use App\Models\Commission;
 use App\Models\CommissionAdjustment;
 use App\Models\Event;
 use App\Models\Order;
+use App\Models\SettlementEntry;
 use App\Support\Concerns\HasOptimisticLock;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,6 +23,7 @@ class FinancialDomainAppendOnlyTest extends TestCase
     private array $appendOnlyModels = [
         Commission::class,
         CommissionAdjustment::class,
+        SettlementEntry::class,
     ];
 
     #[Test]
@@ -29,6 +31,7 @@ class FinancialDomainAppendOnlyTest extends TestCase
     {
         $this->assertNull(Commission::UPDATED_AT);
         $this->assertNull(CommissionAdjustment::UPDATED_AT);
+        $this->assertNull(SettlementEntry::UPDATED_AT);
     }
 
     #[Test]
@@ -36,8 +39,10 @@ class FinancialDomainAppendOnlyTest extends TestCase
     {
         $this->assertFalse(Schema::hasColumn('commissions', 'updated_at'));
         $this->assertFalse(Schema::hasColumn('commission_adjustments', 'updated_at'));
+        $this->assertFalse(Schema::hasColumn('settlement_entries', 'updated_at'));
         $this->assertTrue(Schema::hasColumn('commissions', 'created_at'));
         $this->assertTrue(Schema::hasColumn('commission_adjustments', 'created_at'));
+        $this->assertTrue(Schema::hasColumn('settlement_entries', 'created_at'));
     }
 
     #[Test]

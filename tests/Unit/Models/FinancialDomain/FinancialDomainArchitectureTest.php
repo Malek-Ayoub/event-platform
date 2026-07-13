@@ -7,6 +7,7 @@ use App\Models\CommissionAdjustment;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
 use App\Models\Refund;
+use App\Models\SettlementEntry;
 use App\Support\Concerns\BelongsToVenue;
 use App\Support\Concerns\HasOptimisticLock;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +25,7 @@ class FinancialDomainArchitectureTest extends TestCase
         Refund::class,
         Commission::class,
         CommissionAdjustment::class,
+        SettlementEntry::class,
     ];
 
     #[Test]
@@ -67,8 +69,10 @@ class FinancialDomainArchitectureTest extends TestCase
     {
         $this->assertNull(Commission::UPDATED_AT);
         $this->assertNull(CommissionAdjustment::UPDATED_AT);
+        $this->assertNull(SettlementEntry::UPDATED_AT);
         $this->assertFalse(Schema::hasColumn('commissions', 'updated_at'));
         $this->assertFalse(Schema::hasColumn('commission_adjustments', 'updated_at'));
+        $this->assertFalse(Schema::hasColumn('settlement_entries', 'updated_at'));
     }
 
     #[Test]

@@ -9,6 +9,8 @@ use App\Services\Outbox\Consumers\GenerateQrOnTicketIssuedConsumer;
 use App\Services\Outbox\Consumers\IssueTicketsOnOrderPaidConsumer;
 use App\Services\Outbox\Consumers\RecordCommissionAdjustmentOnRefundProcessedConsumer;
 use App\Services\Outbox\Consumers\RecordCommissionOnOrderPaidConsumer;
+use App\Services\Outbox\Consumers\RecordSettlementOnCommissionAdjustedConsumer;
+use App\Services\Outbox\Consumers\RecordSettlementOnCommissionRecordedConsumer;
 use App\Services\Outbox\Consumers\SendOrderPaidEmailConsumer;
 use App\Services\Outbox\Consumers\SendTicketEmailConsumer;
 use App\Services\Outbox\OutboxConsumerRegistry;
@@ -33,6 +35,8 @@ class OutboxServiceProvider extends ServiceProvider
             $registry->register($app->make(SendOrderPaidEmailConsumer::class));
             $registry->register($app->make(SendTicketEmailConsumer::class));
             $registry->register($app->make(RecordCommissionAdjustmentOnRefundProcessedConsumer::class));
+            $registry->register($app->make(RecordSettlementOnCommissionRecordedConsumer::class));
+            $registry->register($app->make(RecordSettlementOnCommissionAdjustedConsumer::class));
 
             return $registry;
         });
