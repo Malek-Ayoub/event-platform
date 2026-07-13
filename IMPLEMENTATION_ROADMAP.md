@@ -2936,10 +2936,7 @@ Domain & Authorization (§1.1)
   ☑ Phase 8.5.1 — Commission receivable ledger
   ☑ Phase 8.5.3 — Manual commission payments
   ☑ Phase 8.5.4 — Settlement read APIs
-  ⏳ Phase 8.5.5 — Reports
-  ☑ Phase 8.5.5.1 — Organizer Reports
-  ☑ Phase 8.5.5.2 — Admin Reports
-  ☐ Phase 8.5.5.3 — Export + OpenAPI guards
+  ✅ Phase 8.5.5 — Reports (closed)
   ☐ Phase 8.6 — Organizer Dashboard API
   ☐ Phase 8.7 — Admin Dashboard API
   ☐ Backend Freeze Checklist + ADR-0001 + tag v1.0-backend-freeze

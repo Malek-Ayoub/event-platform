@@ -3216,6 +3216,146 @@
                 ]
             }
         },
+        "/api/tenant/organizer/dashboard": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Organizer dashboard overview",
+                "description": "Read-only composition endpoint that aggregates KPIs, today metrics, upcoming events, latest orders, latest check-ins, and commission status for the organizer home screen.",
+                "operationId": "tenant.organizer.dashboard.show",
+                "responses": {
+                    "200": {
+                        "description": "Organizer dashboard overview",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "kpis": {
+                                                    "$ref": "#/components/schemas/OrganizerDashboardKpis"
+                                                },
+                                                "today": {
+                                                    "$ref": "#/components/schemas/OrganizerDashboardToday"
+                                                },
+                                                "events": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/OrganizerDashboardEvent"
+                                                    }
+                                                },
+                                                "latest_orders": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/OrganizerDashboardOrder"
+                                                    }
+                                                },
+                                                "latest_check_ins": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/OrganizerDashboardCheckIn"
+                                                    }
+                                                },
+                                                "commission": {
+                                                    "$ref": "#/components/schemas/OrganizerDashboardCommission"
+                                                },
+                                                "meta": {
+                                                    "$ref": "#/components/schemas/OrganizerDashboardMeta"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "example": {
+                                    "data": {
+                                        "kpis": {
+                                            "gross_sales": "12500.00",
+                                            "net_revenue": "12000.00",
+                                            "orders_count": 84,
+                                            "tickets_sold": 160,
+                                            "tickets_remaining": 40,
+                                            "attendance_rate": "72.50",
+                                            "outstanding_commission": "350.00"
+                                        },
+                                        "today": {
+                                            "today_sales": "450.00",
+                                            "today_orders": 6,
+                                            "today_check_ins": 18,
+                                            "today_revenue": "430.00"
+                                        },
+                                        "events": [
+                                            {
+                                                "id": 12,
+                                                "name": "Summer Festival",
+                                                "starts_at": "2026-08-15T18:00:00+00:00",
+                                                "tickets_sold": 120,
+                                                "capacity": 200,
+                                                "remaining": 80,
+                                                "status": "published"
+                                            }
+                                        ],
+                                        "latest_orders": [
+                                            {
+                                                "order_number": "ORD-10042",
+                                                "customer_name": "Jane Doe",
+                                                "amount": "75.00",
+                                                "status": "paid",
+                                                "created_at": "2026-07-13T14:22:00+00:00"
+                                            }
+                                        ],
+                                        "latest_check_ins": [
+                                            {
+                                                "ticket_number": "EVT-001-000123",
+                                                "holder_name": "Jane Doe",
+                                                "checked_in_at": "2026-07-13T15:05:00+00:00",
+                                                "gate": "Gate 1"
+                                            }
+                                        ],
+                                        "commission": {
+                                            "due": "1250.00",
+                                            "paid": "900.00",
+                                            "outstanding": "350.00"
+                                        },
+                                        "meta": {
+                                            "currency": "USD",
+                                            "generated_at": "2026-07-13T16:00:00+00:00"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/tenant/organizer/reports": {
             "get": {
                 "tags": [
@@ -5355,6 +5495,159 @@
                 },
                 "type": "object"
             },
+            "OrganizerDashboardKpis": {
+                "properties": {
+                    "gross_sales": {
+                        "type": "string",
+                        "example": "12500.00"
+                    },
+                    "net_revenue": {
+                        "type": "string",
+                        "example": "12000.00"
+                    },
+                    "orders_count": {
+                        "type": "integer",
+                        "example": 84
+                    },
+                    "tickets_sold": {
+                        "type": "integer",
+                        "example": 160
+                    },
+                    "tickets_remaining": {
+                        "type": "integer",
+                        "example": 40
+                    },
+                    "attendance_rate": {
+                        "type": "string",
+                        "example": "72.50"
+                    },
+                    "outstanding_commission": {
+                        "type": "string",
+                        "example": "350.00"
+                    }
+                },
+                "type": "object"
+            },
+            "OrganizerDashboardToday": {
+                "properties": {
+                    "today_sales": {
+                        "type": "string",
+                        "example": "450.00"
+                    },
+                    "today_orders": {
+                        "type": "integer",
+                        "example": 6
+                    },
+                    "today_check_ins": {
+                        "type": "integer",
+                        "example": 18
+                    },
+                    "today_revenue": {
+                        "type": "string",
+                        "example": "430.00"
+                    }
+                },
+                "type": "object"
+            },
+            "OrganizerDashboardEvent": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "tickets_sold": {
+                        "type": "integer"
+                    },
+                    "capacity": {
+                        "type": "integer"
+                    },
+                    "remaining": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "OrganizerDashboardOrder": {
+                "properties": {
+                    "order_number": {
+                        "type": "string"
+                    },
+                    "customer_name": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "OrganizerDashboardCheckIn": {
+                "properties": {
+                    "ticket_number": {
+                        "type": "string"
+                    },
+                    "holder_name": {
+                        "type": "string"
+                    },
+                    "checked_in_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "gate": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "OrganizerDashboardCommission": {
+                "properties": {
+                    "due": {
+                        "type": "string",
+                        "example": "1250.00"
+                    },
+                    "paid": {
+                        "type": "string",
+                        "example": "900.00"
+                    },
+                    "outstanding": {
+                        "type": "string",
+                        "example": "350.00"
+                    }
+                },
+                "type": "object"
+            },
+            "OrganizerDashboardMeta": {
+                "properties": {
+                    "currency": {
+                        "type": "string",
+                        "example": "USD"
+                    },
+                    "generated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
             "OrganizerReportSales": {
                 "properties": {
                     "gross_sales": {
@@ -5969,6 +6262,10 @@
         {
             "name": "Settlement",
             "description": "Settlement"
+        },
+        {
+            "name": "Dashboard",
+            "description": "Dashboard"
         },
         {
             "name": "Tickets",
