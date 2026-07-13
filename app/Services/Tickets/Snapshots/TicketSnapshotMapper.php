@@ -35,6 +35,7 @@ final class TicketSnapshotMapper
             ],
             'holder' => [
                 'name' => (string) $order->customer_name,
+                'email' => (string) $order->customer_email,
             ],
             'seat' => [
                 'label' => $this->resolveSeatLabel($order),

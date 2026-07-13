@@ -69,6 +69,7 @@ class TicketSnapshotServiceTest extends TestCase
         $this->assertSame('VIP', $snapshot->payload['ticket_type']['name']);
         $this->assertSame('#FF0000', $snapshot->payload['ticket_type']['color']);
         $this->assertSame('Layla Hassan', $snapshot->payload['holder']['name']);
+        $this->assertSame($order->customer_email, $snapshot->payload['holder']['email']);
         $this->assertSame('150.00', $snapshot->payload['price']['amount']);
         $this->assertSame('EV000001-260801-000001', $snapshot->payload['ticket']['number']);
     }

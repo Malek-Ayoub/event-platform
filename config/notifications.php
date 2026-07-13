@@ -16,6 +16,13 @@ return [
         'ticket_download_url' => '#pending-tickets/{{order_number}}',
     ],
 
+    'ticket_email' => [
+        'enabled' => env('TICKET_EMAIL_ENABLED', true),
+        'queue' => env('TICKET_EMAIL_QUEUE', false),
+        'from_name' => env('TICKET_EMAIL_FROM_NAME', env('MAIL_FROM_NAME', 'Event Platform')),
+        'from_email' => env('TICKET_EMAIL_FROM_EMAIL', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
+    ],
+
     /*
     | Platform-default template fallbacks when no DB template exists.
     | Venue-specific rows in email_templates override these slugs.
