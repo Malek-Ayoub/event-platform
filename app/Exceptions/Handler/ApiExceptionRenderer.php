@@ -47,6 +47,12 @@ class ApiExceptionRenderer
             ], 404);
         }
 
+        if ($exception instanceof \App\Exceptions\Tickets\TicketNotFoundException) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 404);
+        }
+
         if ($exception instanceof StaleModelException) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -95,6 +101,7 @@ class ApiExceptionRenderer
             || str_starts_with($class, 'App\\Exceptions\\Refunds\\')
             || str_starts_with($class, 'App\\Exceptions\\Commissions\\')
             || str_starts_with($class, 'App\\Exceptions\\Events\\')
+            || str_starts_with($class, 'App\\Exceptions\\Tickets\\')
             || str_starts_with($class, 'App\\Exceptions\\PlatformSettings\\')
         ) {
             return 422;

@@ -3176,6 +3176,88 @@
                 ]
             }
         },
+        "/api/tenant/tickets/check-in": {
+            "post": {
+                "tags": [
+                    "Tickets"
+                ],
+                "summary": "Check in a ticket by QR token",
+                "operationId": "tenant.tickets.check-in",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "qr_token"
+                                ],
+                                "properties": {
+                                    "qr_token": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "gate_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "device_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ticket checked in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TicketCheckInResult"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Ticket not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Ticket not eligible for check-in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/tenant/events/{event}/ticket-types": {
             "get": {
                 "tags": [
@@ -4402,6 +4484,40 @@
                 },
                 "type": "object"
             },
+            "TicketCheckInResult": {
+                "required": [
+                    "valid",
+                    "ticket_number",
+                    "holder_name",
+                    "event_name",
+                    "status"
+                ],
+                "properties": {
+                    "valid": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "ticket_number": {
+                        "type": "string",
+                        "example": "EV000001-260801-000001"
+                    },
+                    "holder_name": {
+                        "type": "string",
+                        "example": "Jane Doe"
+                    },
+                    "event_name": {
+                        "type": "string",
+                        "example": "Summer Fest"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "checked_in"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
             "TicketTypeResource": {
                 "properties": {
                     "id": {
@@ -4493,6 +4609,10 @@
         {
             "name": "Platform",
             "description": "Tax rates (tenant-scoped) and platform settings (global, super admin)"
+        },
+        {
+            "name": "Tickets",
+            "description": "Tickets"
         }
     ],
     "security": [

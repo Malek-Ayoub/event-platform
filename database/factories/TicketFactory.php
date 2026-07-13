@@ -100,4 +100,33 @@ class TicketFactory extends Factory
             ];
         });
     }
+
+    public function checkedIn(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => TicketStatus::CheckedIn,
+            'checked_in_at' => now(),
+        ]);
+    }
+
+    public function refunded(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => TicketStatus::Refunded,
+        ]);
+    }
+
+    public function cancelled(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => TicketStatus::Cancelled,
+        ]);
+    }
+
+    public function invalidated(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => TicketStatus::Invalidated,
+        ]);
+    }
 }

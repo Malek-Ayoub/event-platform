@@ -23,6 +23,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $qr_token
  * @property \Illuminate\Support\Carbon|null $issued_at
  * @property TicketStatus $status
+ * @property \Illuminate\Support\Carbon|null $checked_in_at Denormalized cache of the latest check-in (see ticket_check_ins).
+ * @property int|null $checked_in_by Denormalized cache of the staff user for the latest check-in.
  */
 class Ticket extends Model
 {
@@ -90,6 +92,11 @@ class Ticket extends Model
     public function artifacts(): HasMany
     {
         return $this->hasMany(TicketArtifact::class);
+    }
+
+    public function checkIns(): HasMany
+    {
+        return $this->hasMany(TicketCheckIn::class);
     }
 
     public function checkedInBy(): BelongsTo
