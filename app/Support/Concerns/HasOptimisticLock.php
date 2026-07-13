@@ -3,7 +3,6 @@
 namespace App\Support\Concerns;
 
 use App\Exceptions\StaleModelException;
-use Illuminate\Database\Eloquent\Model;
 
 trait HasOptimisticLock
 {

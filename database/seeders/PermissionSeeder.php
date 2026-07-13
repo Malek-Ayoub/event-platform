@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Services\Authorization\PermissionGateRegistrar;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class PermissionSeeder extends Seeder

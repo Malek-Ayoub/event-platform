@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments\Gateway\ApiSyria;
 
+use App\Contracts\Payments\Http\GatewayHttpResponse;
 use App\DTOs\Payments\Gateway\GatewayPaymentAccount;
 use App\Enums\Payments\PaymentWalletProvider;
 use App\Services\Payments\Gateway\Support\GatewayProviderConfig;
@@ -71,7 +72,7 @@ final class ApiSyriaProbeService
     /**
      * @return array<string, mixed>
      */
-    private function decodeSuccessfulBody(\App\Contracts\Payments\Http\GatewayHttpResponse $response): array
+    private function decodeSuccessfulBody(GatewayHttpResponse $response): array
     {
         $body = $response->body;
 

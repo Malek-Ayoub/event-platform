@@ -2,7 +2,9 @@
 
 namespace App\Services\Payments\Gateway\ApiSyria;
 
+use App\Contracts\Payments\Http\GatewayHttpResponse;
 use App\Contracts\Payments\PaymentVerificationGateway;
+use App\DTOs\Payments\Gateway\GatewayPaymentAccount;
 use App\DTOs\Payments\Gateway\VerifyTransactionRequest;
 use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
 use App\Enums\Payments\GatewayOutcome;
@@ -63,8 +65,8 @@ final class ApiSyriaGateway implements PaymentVerificationGateway
     }
 
     private function mapResponse(
-        \App\Contracts\Payments\Http\GatewayHttpResponse $response,
-        \App\DTOs\Payments\Gateway\GatewayPaymentAccount $paymentAccount,
+        GatewayHttpResponse $response,
+        GatewayPaymentAccount $paymentAccount,
     ): VerifyTransactionResponse {
         $bodyArray = $response->body;
 

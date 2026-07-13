@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Enums\Tickets\TicketArtifactStatus;
 use App\Enums\Tickets\TicketArtifactType;
+use Database\Factories\TicketArtifactFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -18,11 +20,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $path
  * @property string $mime_type
  * @property string|null $checksum
- * @property \Illuminate\Support\Carbon $generated_at
+ * @property Carbon $generated_at
  */
 class TicketArtifact extends Model
 {
-    /** @use HasFactory<\Database\Factories\TicketArtifactFactory> */
+    /** @use HasFactory<TicketArtifactFactory> */
     use HasFactory;
 
     protected $fillable = [

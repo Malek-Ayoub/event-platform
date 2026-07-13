@@ -7,6 +7,7 @@ use App\Models\Scopes\BelongsToVenueScope;
 use App\Models\SettlementEntry;
 use App\Services\Settlements\Data\AppendSettlementEntryData;
 use App\Services\TransactionRunner;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 
 class SettlementEntryService
@@ -87,7 +88,7 @@ class SettlementEntryService
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Builder<SettlementEntry>
+     * @return Builder<SettlementEntry>
      */
     private function venueEntryQuery(int $venueId)
     {

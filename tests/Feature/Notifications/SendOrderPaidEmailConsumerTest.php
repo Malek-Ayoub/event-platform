@@ -11,6 +11,7 @@ use App\Models\OutboxEvent;
 use App\Models\PaymentTransaction;
 use App\Models\Scopes\BelongsToVenueScope;
 use App\Models\Ticket;
+use App\Models\Venue;
 use App\Repositories\ConsumerReceiptRepository;
 use App\Services\Outbox\OutboxDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -192,10 +193,7 @@ class SendOrderPaidEmailConsumerTest extends TestCase
         );
     }
 
-    /**
-     * @return OutboxEvent
-     */
-    private function createOrderPaidOutboxEvent(\App\Models\Venue $venue): OutboxEvent
+    private function createOrderPaidOutboxEvent(Venue $venue): OutboxEvent
     {
         $event = Event::factory()->create([
             'venue_id' => $venue->id,

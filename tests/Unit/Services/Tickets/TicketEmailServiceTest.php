@@ -68,7 +68,7 @@ class TicketEmailServiceTest extends TestCase
 
         $this->assertTrue($result->wasSent);
 
-        Mail::assertSent(TicketIssuedMail::class, function (TicketIssuedMail $mail) use ($ticket): bool {
+        Mail::assertSent(TicketIssuedMail::class, function (TicketIssuedMail $mail): bool {
             return count($mail->attachments()) === 1
                 && data_get($mail->snapshot->payload, 'event.name') === 'Snapshot Night'
                 && data_get($mail->snapshot->payload, 'holder.email') === 'layla@example.com';

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -21,9 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $serial
  * @property string $ticket_number
  * @property string $qr_token
- * @property \Illuminate\Support\Carbon|null $issued_at
+ * @property Carbon|null $issued_at
  * @property TicketStatus $status
- * @property \Illuminate\Support\Carbon|null $checked_in_at Denormalized cache of the latest check-in (see ticket_check_ins).
+ * @property Carbon|null $checked_in_at Denormalized cache of the latest check-in (see ticket_check_ins).
  * @property int|null $checked_in_by Denormalized cache of the staff user for the latest check-in.
  */
 class Ticket extends Model

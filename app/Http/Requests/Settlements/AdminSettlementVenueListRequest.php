@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests\Settlements;
 
-use App\Models\Venue;
-
 class AdminSettlementVenueListRequest extends SettlementReadRequest
 {
     public function authorize(): bool

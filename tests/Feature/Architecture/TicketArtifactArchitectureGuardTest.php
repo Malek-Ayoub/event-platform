@@ -3,6 +3,7 @@
 namespace Tests\Feature\Architecture;
 
 use App\Services\Orders\TicketService;
+use App\Services\Tickets\TicketQrService;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -35,6 +36,6 @@ class TicketArtifactArchitectureGuardTest extends TestCase
     public function ticket_qr_service_is_the_qr_artifact_entry_point(): void
     {
         $this->assertTrue(class_exists(TicketService::class));
-        $this->assertTrue(class_exists(\App\Services\Tickets\TicketQrService::class));
+        $this->assertTrue(class_exists(TicketQrService::class));
     }
 }

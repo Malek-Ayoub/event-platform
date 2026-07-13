@@ -10,6 +10,7 @@ use App\Models\OrderItem;
 use App\Models\OutboxEvent;
 use App\Models\Ticket;
 use App\Models\TicketSerialCounter;
+use App\Models\TicketSnapshot;
 use App\Models\TicketType;
 use App\Services\Orders\IssueTicketsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,7 +43,7 @@ class IssueTicketsServiceTest extends TestCase
         $this->assertTrue($result->newlyIssued);
         $this->assertCount(2, $result->tickets);
         $this->assertSame(2, Ticket::query()->where('order_id', $order->id)->count());
-        $this->assertSame(2, \App\Models\TicketSnapshot::query()->count());
+        $this->assertSame(2, TicketSnapshot::query()->count());
         $this->assertSame(2, OutboxEvent::query()->where('event_type', 'ticket.issued')->count());
     }
 

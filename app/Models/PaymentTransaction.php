@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $order_id
  * @property PaymentTransactionStatus $status
  * @property string|null $transaction_number Customer-submitted transaction number (Manual Wallet Transfer, §7.9)
- * @property \Illuminate\Support\Carbon|null $expires_at Payment instruction expiry (Manual Wallet Transfer, §7.9)
+ * @property Carbon|null $expires_at Payment instruction expiry (Manual Wallet Transfer, §7.9)
  */
 class PaymentTransaction extends Model
 {

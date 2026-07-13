@@ -3,6 +3,7 @@
 namespace App\DTOs\Payments\Gateway;
 
 use App\DTOs\BaseDTO;
+use App\Enums\Payments\PaymentWalletProvider;
 
 /**
  * Gateway-layer transaction-lookup request (Batch 7.6 — Manual Wallet Transfer).
@@ -29,7 +30,7 @@ readonly class VerifyTransactionRequest extends BaseDTO
             expectedAmount: (string) $data['expected_amount'],
             expectedCurrency: (string) $data['expected_currency'],
             paymentAccount: new GatewayPaymentAccount(
-                provider: \App\Enums\Payments\PaymentWalletProvider::from((string) $accountData['provider']),
+                provider: PaymentWalletProvider::from((string) $accountData['provider']),
                 accountIdentifier: (string) $accountData['account_identifier'],
                 cashCode: isset($accountData['cash_code']) ? (string) $accountData['cash_code'] : null,
                 currency: isset($accountData['currency']) ? (string) $accountData['currency'] : null,

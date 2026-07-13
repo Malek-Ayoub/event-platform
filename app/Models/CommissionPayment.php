@@ -8,6 +8,7 @@ use Database\Factories\CommissionPaymentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Immutable record of commission received from an organizer outside the platform (Phase 8.5.3).
@@ -19,11 +20,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $currency
  * @property CommissionPaymentMethod $payment_method
  * @property string|null $reference_number
- * @property \Illuminate\Support\Carbon $received_at
+ * @property Carbon $received_at
  * @property int $received_by_user_id
  * @property string|null $notes
  * @property array<string, mixed>|null $metadata
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon $created_at
  */
 class CommissionPayment extends Model
 {

@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\UserPermission;
 use App\Policies\UserPermissionPolicy;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -197,9 +198,9 @@ class PermissionService
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Builder<UserPermission>
+     * @return Builder<UserPermission>
      */
-    protected function userPermissionQuery(): \Illuminate\Database\Eloquent\Builder
+    protected function userPermissionQuery(): Builder
     {
         return UserPermission::query()->withoutGlobalScope(BelongsToVenueScope::class);
     }

@@ -32,16 +32,16 @@ class AdminSettlementVenueListService
     ): LengthAwarePaginator {
         $settlementTotals = DB::table('settlement_entries')
             ->select('venue_id')
-            ->selectRaw("COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as commission_due_total", [SettlementEntryType::CommissionDue->value])
-            ->selectRaw("COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as commission_adjustment_total", [SettlementEntryType::CommissionAdjustment->value])
-            ->selectRaw("COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as commission_paid_total", [SettlementEntryType::CommissionPaid->value])
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as commission_due_total', [SettlementEntryType::CommissionDue->value])
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as commission_adjustment_total', [SettlementEntryType::CommissionAdjustment->value])
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount ELSE 0 END), 0) as commission_paid_total', [SettlementEntryType::CommissionPaid->value])
             ->when($range->from !== null, fn ($query) => $query->where('occurred_at', '>=', $range->from))
             ->when($range->to !== null, fn ($query) => $query->where('occurred_at', '<=', $range->to))
             ->groupBy('venue_id');
 
         $outstandingTotals = DB::table('settlement_entries')
             ->select('venue_id')
-            ->selectRaw("COALESCE(SUM(CASE WHEN type = ? THEN amount WHEN type IN (?, ?) THEN -amount ELSE 0 END), 0) as outstanding_commission", [
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN amount WHEN type IN (?, ?) THEN -amount ELSE 0 END), 0) as outstanding_commission', [
                 SettlementEntryType::CommissionDue->value,
                 SettlementEntryType::CommissionAdjustment->value,
                 SettlementEntryType::CommissionPaid->value,

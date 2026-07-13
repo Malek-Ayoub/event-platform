@@ -2,8 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\DTOs\Payments\Gateway\GatewayPaymentAccount;
-use App\Enums\Payments\PaymentWalletProvider;
 use App\Models\PaymentAccount;
 use App\Services\Payments\Gateway\ApiSyria\ApiSyriaProbeService;
 use App\Services\Payments\Gateway\Support\GatewayProviderConfig;

@@ -2,8 +2,10 @@
 
 namespace App\Services\Payments;
 
+use App\DTOs\Payments\Gateway\GatewayPaymentAccount;
 use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Models\Order;
+use App\Models\PaymentAccount;
 use App\Models\PaymentTransaction;
 use App\Services\Payments\Data\CreateAwaitingTransferData;
 use App\Services\Payments\Data\CreatePaymentInstructionsData;
@@ -80,7 +82,7 @@ final class PaymentInstructionService
 
     private function toInstructionData(
         PaymentTransaction $payment,
-        \App\DTOs\Payments\Gateway\GatewayPaymentAccount $paymentAccount,
+        GatewayPaymentAccount $paymentAccount,
     ): PaymentInstructionData {
         $expiresAt = $payment->expires_at ?? now()->addHours((int) config('payment_gateways.instruction_ttl_hours', 24));
         $merchantAccount = $paymentAccount->accountIdentifier;
@@ -118,7 +120,7 @@ final class PaymentInstructionService
         );
     }
 
-    private function resolveCurrency(Order $order, \App\Models\PaymentAccount $paymentAccount): string
+    private function resolveCurrency(Order $order, PaymentAccount $paymentAccount): string
     {
         if (is_string($paymentAccount->currency) && $paymentAccount->currency !== '') {
             return strtoupper($paymentAccount->currency);

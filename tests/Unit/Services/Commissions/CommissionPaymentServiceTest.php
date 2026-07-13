@@ -7,7 +7,6 @@ use App\Enums\FinancialDomain\SettlementEntryDirection;
 use App\Enums\FinancialDomain\SettlementEntryType;
 use App\Exceptions\Settlements\NoOutstandingCommissionException;
 use App\Exceptions\Settlements\PaymentExceedsOutstandingCommissionException;
-use App\Models\ActivityLog;
 use App\Models\CommissionPayment;
 use App\Models\Event;
 use App\Models\Order;

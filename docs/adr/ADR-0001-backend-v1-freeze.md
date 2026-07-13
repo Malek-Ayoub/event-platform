@@ -2,15 +2,16 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft — to be completed before `git tag v1.0-backend-freeze` |
+| **Status** | Accepted |
 | **Date** | 2026-07-13 |
 | **Scope** | Backend v1 — all domains through Phase 8.7 |
+| **Tag** | `v1.0-backend-freeze` (Batch 10.2) |
 
 ## Context
 
 The Event Platform is a multi-tenant Laravel application for event ticketing in Syria. Buyers pay organizers directly via mobile wallets (ShamCash, Syriatel Cash via API Syria). The platform does **not** hold ticket revenue; it tracks **commission receivable** from organizers.
 
-Backend v1 is considered complete when Phases 8.5.5–8.7 pass, the [Backend Freeze Checklist](../../IMPLEMENTATION_ROADMAP.md#backend-freeze-checklist-إلزامية-قبل-git-tag) is green, and this ADR is marked **Accepted**.
+Backend v1 is complete when Phases 8.5.5–8.7 pass, the [Backend Freeze Checklist](../../IMPLEMENTATION_ROADMAP.md#backend-freeze-checklist-إلزامية-قبل-git-tag) is green, and this ADR is **Accepted**.
 
 ## Decision summary
 
@@ -30,6 +31,7 @@ The following decisions are **frozen** at v1. Changes require a new ADR and shou
 
 - **Decision:** Domain side-effects that must survive process crashes are written to `outbox_events` **inside the same database transaction** as the aggregate change.
 - **Consumers:** Separate worker processes events asynchronously (`commission.recorded`, `commission.adjusted`, `commission.payment_recorded`, ticket artifacts, etc.).
+- **Worker:** `php artisan outbox:process` (batch loop or `--once`); must be scheduled in production.
 - **Consequence:** No direct email/PDF/ledger writes from controllers; services publish via `OutboxService`.
 
 ---
@@ -107,7 +109,28 @@ The following decisions are **frozen** at v1. Changes require a new ADR and shou
 
 ---
 
-### 9. Check-in
+### 9. Reports composition layer (Phase 8.5.5)
+
+- **Decision:** Financial and operational reports are **read-only composition** over existing tables — no new domain writes.
+- **Organizer:** `GET /api/tenant/organizer/reports?from=&to=&event_id=` — `reports.view` or super admin.
+- **Admin:** `GET /api/admin/reports?from=&to=&limit=` — super admin only.
+- **Query services:** `PlatformRevenueQuery`, `CommissionReportQuery`, `TopVenuesQuery`, `TopEventsQuery`, `PaymentMethodReportQuery`, `RefundReportQuery` orchestrated by `OrganizerReportService` / `AdminReportService`.
+- **Consequence:** Report math reuses `SettlementSummaryService` and `SettlementDateRange`; architecture guards block write-side service dependencies.
+
+---
+
+### 10. Dashboard composition layers (Phases 8.6–8.7)
+
+- **Decision:** Organizer and admin home screens each use **one primary read endpoint** — no new domain, migrations, or writes.
+- **Organizer:** `GET /api/tenant/organizer/dashboard` — KPIs, today, upcoming events, latest orders/check-ins, commission snapshot.
+- **Admin:** `GET /api/admin/dashboard` — platform KPIs, today, top venues/events (`limit=5`), latest orders/payments/check-ins, three alert widgets.
+- **Implementation:** `OrganizerDashboardService` / `AdminDashboardService` as orchestrators only; dedicated `*Query` classes use `DB::table()` joins with fixed `LIMIT` — no Eloquent N+1.
+- **Empty state:** Financial values `0.00`, lists `[]`, never `null`.
+- **Consequence:** Dashboard APIs are projections; changes to underlying report queries propagate automatically.
+
+---
+
+### 11. Check-in
 
 - **Decision:** QR scan resolves ticket by serial; check-in is idempotent-aware (reject double check-in, cancelled, invalidated).
 - **Audit:** Check-in history recorded; activity log on state change.
@@ -115,21 +138,21 @@ The following decisions are **frozen** at v1. Changes require a new ADR and shou
 
 ---
 
-### 10. Authorization
+### 12. Authorization
 
 - **Decision:** RBAC via `PermissionService` + policies; super admin bypass for platform operations.
-- **Organizer settlement/reports:** `reports.view` permission on venue.
-- **Admin financial operations:** super admin only (commission payment recording, admin settlement).
+- **Organizer settlement/reports/dashboard:** `reports.view` permission on venue (or super admin).
+- **Admin financial operations:** super admin only (commission payment recording, admin settlement, admin reports, admin dashboard).
 - **Consequence:** Permission slugs are part of the frozen contract.
 
 ---
 
-### 11. API conventions
+### 13. API conventions
 
 - **Thin controllers** → services → DTOs → resources.
 - **OpenAPI** required for all named routes (`OpenApiContractGuardTest`).
-- **Architecture guards** block direct model/DB access in controllers.
-- **Pagination:** unified contract for all list endpoints.
+- **Architecture guards** block direct model/DB access in controllers and write-side dependencies in read layers.
+- **Pagination:** unified contract for all list endpoints; dashboard “latest” widgets use fixed limits (5).
 
 ---
 
@@ -140,6 +163,7 @@ The following decisions are **frozen** at v1. Changes require a new ADR and shou
 - Webhook-based payment confirmation (removed in Phase 7.9)
 - Native mobile apps (PWA scanner sufficient for MVP)
 - Full notification templates admin (email delivery for tickets exists; SMS admin deferred)
+- Frontend (Phase 9)
 
 ---
 
@@ -150,15 +174,30 @@ The following decisions are **frozen** at v1. Changes require a new ADR and shou
 | Bug fixes | Domain redesign |
 | Small response tweaks | New ledger tables |
 | Optional endpoints | Speculative features |
+| Read-only composition layers | New migrations for domain |
+
+---
+
+## Linked commits (Backend v1 core)
+
+| Phase | Commit | Summary |
+|-------|--------|---------|
+| 8.5.4 | `d1fab6a` | Settlement read APIs |
+| 8.5.5.1 | `d76986e` | Organizer reports |
+| 8.5.5.2 | `ca6fc9d` | Admin reports |
+| 8.5.5.3 | `d70b58a` | Reports closed (OpenAPI, guards) |
+| 8.6.1 | `468672b` | Organizer dashboard |
+| 8.7 | `2c3af7a` | Admin dashboard |
+| 10.1 | *(this audit)* | Backend freeze audit + Pint |
 
 ---
 
 ## Completion checklist (this ADR)
 
-- [ ] All sections reviewed against actual code
-- [ ] Linked commits documented (8.5.1, 8.5.3, 8.5.4, …)
-- [ ] Status changed to **Accepted**
-- [ ] `git tag v1.0-backend-freeze` created
+- [x] All sections reviewed against actual code
+- [x] Linked commits documented
+- [x] Status changed to **Accepted**
+- [ ] `git tag v1.0-backend-freeze` created (Batch 10.2)
 
 ---
 

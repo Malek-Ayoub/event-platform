@@ -39,7 +39,7 @@ class TicketCheckInArchitectureGuardTest extends TestCase
 
         $this->assertStringContainsString("where('qr_token'", $source);
         $this->assertStringNotContainsString('whereKey(', $source);
-        $this->assertStringNotContainsString("findOrFail($", $source);
+        $this->assertStringNotContainsString('findOrFail($', $source);
     }
 
     /**

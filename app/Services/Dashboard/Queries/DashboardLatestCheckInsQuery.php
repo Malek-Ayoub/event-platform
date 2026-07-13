@@ -2,6 +2,7 @@
 
 namespace App\Services\Dashboard\Queries;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DashboardLatestCheckInsQuery
@@ -31,7 +32,7 @@ class DashboardLatestCheckInsQuery
             'ticket_number' => (string) $row->ticket_number,
             'holder_name' => (string) ($row->customer_name ?? ''),
             'checked_in_at' => $row->checked_in_at !== null
-                ? (string) \Illuminate\Support\Carbon::parse((string) $row->checked_in_at)->toIso8601String()
+                ? (string) Carbon::parse((string) $row->checked_in_at)->toIso8601String()
                 : null,
             'gate' => $this->resolveGateLabel($row),
         ])->all();

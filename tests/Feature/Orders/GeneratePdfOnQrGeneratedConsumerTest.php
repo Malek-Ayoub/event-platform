@@ -9,7 +9,6 @@ use App\Enums\OrdersDomain\OrderStatus;
 use App\Enums\Tickets\TicketArtifactStatus;
 use App\Enums\Tickets\TicketArtifactType;
 use App\Models\Event;
-use App\Models\Order;
 use App\Models\OutboxEvent;
 use App\Models\Scopes\BelongsToVenueScope;
 use App\Models\Ticket;

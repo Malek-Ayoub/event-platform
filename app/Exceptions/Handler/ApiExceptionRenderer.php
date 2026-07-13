@@ -5,6 +5,7 @@ namespace App\Exceptions\Handler;
 use App\Exceptions\CrossTenantAccessException;
 use App\Exceptions\StaleModelException;
 use App\Exceptions\TenantNotResolvedException;
+use App\Exceptions\Tickets\TicketNotFoundException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -47,7 +48,7 @@ class ApiExceptionRenderer
             ], 404);
         }
 
-        if ($exception instanceof \App\Exceptions\Tickets\TicketNotFoundException) {
+        if ($exception instanceof TicketNotFoundException) {
             return response()->json([
                 'message' => $exception->getMessage(),
             ], 404);

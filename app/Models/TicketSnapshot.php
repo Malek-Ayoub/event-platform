@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\TicketSnapshotFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class TicketSnapshot extends Model
 {
-    /** @use HasFactory<\Database\Factories\TicketSnapshotFactory> */
+    /** @use HasFactory<TicketSnapshotFactory> */
     use HasFactory;
 
     protected $fillable = [

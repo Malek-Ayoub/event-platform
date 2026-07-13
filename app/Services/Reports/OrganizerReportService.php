@@ -17,7 +17,9 @@ use App\Services\Reports\Data\OrganizerReportFilter;
 use App\Services\Settlements\Data\SettlementDateRange;
 use App\Services\Settlements\SettlementSummaryService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Carbon;
 
 class OrganizerReportService
 {
@@ -192,7 +194,7 @@ class OrganizerReportService
     private function outstandingCommissionForEvent(
         int $venueId,
         int $eventId,
-        ?\Illuminate\Support\Carbon $asOf = null,
+        ?Carbon $asOf = null,
     ): string {
         $range = new SettlementDateRange(to: $asOf);
         $filter = new OrganizerReportFilter($venueId, $range, $eventId);
@@ -237,7 +239,7 @@ class OrganizerReportService
     }
 
     /**
-     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @param  Builder<Model>  $query
      */
     private function applyDateRange(Builder $query, string $column, SettlementDateRange $range): void
     {

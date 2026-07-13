@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\Payments;
 
+use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
 use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Enums\Payments\GatewayOutcome;
@@ -11,10 +12,10 @@ use App\Models\EventPaymentAccount;
 use App\Models\Order;
 use App\Models\PaymentAccount;
 use App\Models\PaymentTransaction;
+use App\Models\Venue;
 use App\Services\Payments\Data\VerifyTransactionData;
 use App\Services\Payments\Gateway\PaymentGatewayRegistry;
 use App\Services\Payments\PaymentVerificationService;
-use App\DTOs\Payments\Gateway\VerifyTransactionResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -148,7 +149,7 @@ class PaymentVerificationServiceTest extends TestCase
         }
 
         if ($paymentAccountId === null) {
-            $venue = \App\Models\Venue::query()->findOrFail($venueId);
+            $venue = Venue::query()->findOrFail($venueId);
             $account = PaymentAccount::query()->firstOrCreate(
                 [
                     'venue_id' => $venue->id,

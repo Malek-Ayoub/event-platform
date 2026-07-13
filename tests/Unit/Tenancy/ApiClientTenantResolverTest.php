@@ -2,9 +2,9 @@
 
 namespace Tests\Unit\Tenancy;
 
+use App\Domain\Tenancy\Data\ResolvedApiClientData;
 use App\Domain\Tenancy\Resolvers\ApiClientTenantResolver;
 use App\Domain\Tenancy\TenantContext;
-use App\Domain\Tenancy\Data\ResolvedApiClientData;
 use App\Exceptions\InvalidApiClientException;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\Test;

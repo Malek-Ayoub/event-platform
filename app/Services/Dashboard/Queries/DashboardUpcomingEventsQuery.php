@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardUpcomingEventsQuery
 {
-  /**
-   * @return list<array<string, mixed>>
-   */
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function execute(int $venueId, int $limit = 5, ?Carbon $asOf = null): array
     {
         $moment = ($asOf ?? now())->copy();

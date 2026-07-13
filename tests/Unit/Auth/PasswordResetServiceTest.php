@@ -3,6 +3,7 @@
 namespace Tests\Unit\Auth;
 
 use App\DTOs\Auth\ChangePasswordDTO;
+use App\DTOs\Auth\ResetPasswordDTO;
 use App\Models\User;
 use App\Services\Auth\PasswordResetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,7 +58,7 @@ class PasswordResetServiceTest extends TestCase
         $user = User::factory()->create(['email' => 'reset@example.com']);
         $token = Password::broker('users')->createToken($user);
 
-        $this->service->resetPassword(new \App\DTOs\Auth\ResetPasswordDTO(
+        $this->service->resetPassword(new ResetPasswordDTO(
             email: 'reset@example.com',
             token: $token,
             password: 'NewPassword123!',

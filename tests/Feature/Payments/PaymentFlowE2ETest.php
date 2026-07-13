@@ -9,7 +9,6 @@ use App\Enums\OrdersDomain\OrderStatus;
 use App\Models\ActivityLog;
 use App\Models\Commission;
 use App\Models\CommissionAdjustment;
-use App\Models\Order;
 use App\Models\OutboxEvent;
 use App\Models\PaymentTransaction;
 use App\Models\Refund;

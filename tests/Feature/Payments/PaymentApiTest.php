@@ -10,7 +10,6 @@ use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Support\Concerns\InteractsWithPaymentFlows;
 use Tests\TestCase;

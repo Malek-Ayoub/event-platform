@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Reports;
 
+use App\Enums\OrdersDomain\OrderStatus;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\Venue;
-use App\Enums\OrdersDomain\OrderStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;

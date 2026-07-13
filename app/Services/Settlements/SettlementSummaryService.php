@@ -14,6 +14,8 @@ use App\Models\Ticket;
 use App\Services\Settlements\Data\SettlementDateRange;
 use App\Services\Settlements\Data\SettlementSummaryData;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 class SettlementSummaryService
 {
@@ -42,7 +44,7 @@ class SettlementSummaryService
         );
     }
 
-    public function outstandingCommission(int $venueId, ?\Illuminate\Support\Carbon $asOf = null): string
+    public function outstandingCommission(int $venueId, ?Carbon $asOf = null): string
     {
         $due = $this->sumSettlementAmount($venueId, SettlementEntryType::CommissionDue, $this->asOfRange($asOf));
         $adjustments = $this->sumSettlementAmount($venueId, SettlementEntryType::CommissionAdjustment, $this->asOfRange($asOf));
@@ -113,7 +115,7 @@ class SettlementSummaryService
     }
 
     /**
-     * @param  Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @param  Builder<Model>  $query
      */
     private function applyDateRange(Builder $query, string $column, SettlementDateRange $range): void
     {
@@ -126,7 +128,7 @@ class SettlementSummaryService
         }
     }
 
-    private function asOfRange(?\Illuminate\Support\Carbon $asOf): SettlementDateRange
+    private function asOfRange(?Carbon $asOf): SettlementDateRange
     {
         return new SettlementDateRange(to: $asOf);
     }

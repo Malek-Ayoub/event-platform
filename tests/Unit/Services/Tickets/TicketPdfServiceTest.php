@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services\Tickets;
 
+use App\Contracts\Tickets\QrImageGeneratorInterface;
 use App\Contracts\Tickets\TicketPdfRendererInterface;
 use App\Contracts\Tickets\TicketPdfStorageInterface;
 use App\Enums\OrdersDomain\OrderStatus;
@@ -43,7 +44,7 @@ class TicketPdfServiceTest extends TestCase
         $this->renderer = new RecordingTicketPdfRenderer;
         $this->app->instance(TicketPdfRendererInterface::class, $this->renderer);
         $this->app->instance(
-            \App\Contracts\Tickets\QrImageGeneratorInterface::class,
+            QrImageGeneratorInterface::class,
             new RecordingQrImageGenerator,
         );
     }

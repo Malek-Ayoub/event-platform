@@ -4,12 +4,8 @@ namespace Tests\Unit\Authorization;
 
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
-use App\Models\UserPermission;
-use App\Models\Venue;
 use App\Policies\UserPermissionPolicy;
-use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Gate;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Support\Concerns\SeedsPermissions;
 use Tests\TestCase;

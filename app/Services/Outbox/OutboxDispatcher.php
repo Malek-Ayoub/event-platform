@@ -2,7 +2,6 @@
 
 namespace App\Services\Outbox;
 
-use App\Contracts\Outbox\OutboxConsumer;
 use App\Models\OutboxEvent;
 use App\Repositories\ConsumerReceiptRepository;
 use App\Repositories\OutboxRepository;

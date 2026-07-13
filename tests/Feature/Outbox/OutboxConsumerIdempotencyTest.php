@@ -6,6 +6,7 @@ use App\Contracts\Outbox\OutboxConsumer;
 use App\Enums\InfrastructureDomain\OutboxEventStatus;
 use App\Models\OutboxConsumerReceipt;
 use App\Models\OutboxEvent;
+use App\Models\Scopes\BelongsToVenueScope;
 use App\Repositories\ConsumerReceiptRepository;
 use App\Services\Outbox\OutboxConsumerRegistry;
 use App\Services\Outbox\OutboxDispatcher;
@@ -116,7 +117,7 @@ class OutboxConsumerIdempotencyTest extends TestCase
         $this->assertSame(OutboxEventStatus::Pending, $outbox->fresh()->status);
 
         OutboxEvent::query()
-            ->withoutGlobalScope(\App\Models\Scopes\BelongsToVenueScope::class)
+            ->withoutGlobalScope(BelongsToVenueScope::class)
             ->whereKey($outbox->id)
             ->update(['updated_at' => now()->subHour()]);
 

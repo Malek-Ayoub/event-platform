@@ -15,11 +15,14 @@ use App\Models\Scopes\BelongsToVenueScope;
 use App\Models\Ticket;
 use App\Models\TicketSnapshot;
 use App\Models\TicketType;
+use App\Models\User;
+use App\Models\Venue;
 use App\Repositories\ConsumerReceiptRepository;
 use App\Services\Orders\Data\CreateOrderData;
 use App\Services\Orders\Data\CreateOrderLineItemData;
 use App\Services\Orders\OrderService;
 use App\Services\Outbox\OutboxDispatcher;
+use App\Services\Tickets\Artifacts\TicketArtifactService;
 use App\Services\Tickets\TicketEmailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -187,10 +190,7 @@ class SendTicketEmailConsumerTest extends TestCase
         );
     }
 
-    /**
-     * @return Order
-     */
-    private function createPaidOrderWithTickets(\App\Models\Venue $venue, \App\Models\User $owner, int $ticketCount): Order
+    private function createPaidOrderWithTickets(Venue $venue, User $owner, int $ticketCount): Order
     {
         $event = Event::factory()->create(['venue_id' => $venue->id, 'name' => 'Email Fest']);
         $this->attachDefaultPaymentAccount($event);
@@ -236,7 +236,7 @@ class SendTicketEmailConsumerTest extends TestCase
         app(OutboxDispatcher::class)->dispatchPending();
     }
 
-    private function createTicketReadyForEmail(\App\Models\Venue $venue): Ticket
+    private function createTicketReadyForEmail(Venue $venue): Ticket
     {
         $event = Event::factory()->create(['venue_id' => $venue->id]);
         $order = Order::factory()->forEvent($event)->create([
@@ -255,7 +255,7 @@ class SendTicketEmailConsumerTest extends TestCase
         TicketSnapshot::factory()->forTicket($ticket)->create();
         Storage::disk('local')->put('tickets/pdf/'.$ticket->id.'/v1.pdf', 'pdf-binary');
 
-        app(\App\Services\Tickets\Artifacts\TicketArtifactService::class)->appendVersion(
+        app(TicketArtifactService::class)->appendVersion(
             ticket: $ticket,
             type: TicketArtifactType::Pdf,
             disk: 'local',

@@ -10,6 +10,7 @@ use App\Services\Settlements\Data\SettlementDateRange;
 use App\Services\Settlements\Data\SettlementLedgerEntryData;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class SettlementLedgerService
@@ -81,7 +82,7 @@ class SettlementLedgerService
         return $this->mapEntriesWithBalance($entriesInRange, $runningBalance);
     }
 
-    public function openingBalance(int $venueId, ?\Illuminate\Support\Carbon $from = null): string
+    public function openingBalance(int $venueId, ?Carbon $from = null): string
     {
         if ($from === null) {
             return '0.00';

@@ -12,6 +12,7 @@ use App\Models\Ticket;
 use App\Models\TicketCheckIn;
 use App\Models\TicketSnapshot;
 use App\Models\TicketType;
+use App\Models\User;
 use App\Services\Orders\QrTokenGenerator;
 use App\Services\Tickets\CheckIn\Data\CheckInTicketData;
 use App\Services\Tickets\CheckIn\TicketCheckInService;
@@ -163,7 +164,7 @@ class TicketCheckInServiceTest extends TestCase
     }
 
     /**
-     * @return array{ticket: Ticket, staff: \App\Models\User, event: Event}
+     * @return array{ticket: Ticket, staff: User, event: Event}
      */
     private function createIssuedTicket(?TicketStatus $status = null): array
     {

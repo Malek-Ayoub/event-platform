@@ -7,7 +7,6 @@ use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\Payments\VerificationFailureReason;
 use App\Exceptions\Payments\DuplicateTransactionNumberException;
 use App\Models\PaymentTransaction;
-use App\Support\Payments\PaymentCorrelation;
 use App\Services\Payments\Data\BeginVerificationData;
 use App\Services\Payments\Data\ExpirePaymentData;
 use App\Services\Payments\Data\GatewayVerifyTransactionData;
@@ -15,6 +14,7 @@ use App\Services\Payments\Data\MarkPaidData;
 use App\Services\Payments\Data\MarkVerificationFailedData;
 use App\Services\Payments\Data\VerifyTransactionData;
 use App\Services\Payments\Mapping\GatewayPaymentAccountMapper;
+use App\Support\Payments\PaymentCorrelation;
 
 /**
  * Manual Wallet Transfer — orchestrates verification without direct Gateway access

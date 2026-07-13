@@ -2,8 +2,6 @@
 
 namespace Tests\Feature\Reports;
 
-use App\Enums\FinancialDomain\PaymentTransactionStatus;
-use App\Enums\FinancialDomain\RefundStatus;
 use App\Enums\FinancialDomain\SettlementEntryDirection;
 use App\Enums\FinancialDomain\SettlementEntryType;
 use App\Enums\OrdersDomain\OrderStatus;
@@ -11,7 +9,6 @@ use App\Enums\OrdersDomain\TicketStatus;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
-use App\Models\Refund;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Venue;

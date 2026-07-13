@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Auth;
 
-use App\DTOs\Auth\ChangePasswordDTO;
 use App\DTOs\Auth\LoginDTO;
 use App\DTOs\Auth\RegisterDTO;
 use App\Models\User;
@@ -11,7 +10,6 @@ use App\Services\Auth\LoginService;
 use App\Services\Auth\RegisterService;
 use App\Services\Auth\TokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 

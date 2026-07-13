@@ -3,7 +3,6 @@
 namespace Tests\Unit\Services\Commissions;
 
 use App\Enums\FinancialDomain\CommissionStatus;
-use App\Enums\FinancialDomain\PaymentTransactionStatus;
 use App\Enums\FinancialDomain\RefundStatus;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Exceptions\Commissions\AdjustmentExceedsCommissionException;

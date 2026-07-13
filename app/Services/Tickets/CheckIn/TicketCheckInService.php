@@ -10,6 +10,7 @@ use App\Services\OutboxService;
 use App\Services\Tickets\CheckIn\Data\CheckInTicketData;
 use App\Services\Tickets\CheckIn\Data\TicketCheckInResult;
 use App\Services\TransactionRunner;
+use Illuminate\Support\Carbon;
 
 /**
  * Performs ticket check-in with row locking and immutable audit history (Phase 8.4).
@@ -76,7 +77,7 @@ final class TicketCheckInService
     /**
      * Denormalized cache on `tickets` — mirrors the latest row in `ticket_check_ins`.
      */
-    private function syncLatestCheckInCache(Ticket $ticket, \Illuminate\Support\Carbon $checkedInAt, int $checkedInByUserId): void
+    private function syncLatestCheckInCache(Ticket $ticket, Carbon $checkedInAt, int $checkedInByUserId): void
     {
         $ticket->update([
             'status' => TicketStatus::CheckedIn,

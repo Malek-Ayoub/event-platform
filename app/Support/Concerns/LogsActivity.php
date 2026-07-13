@@ -2,6 +2,7 @@
 
 namespace App\Support\Concerns;
 
+use App\Events\ActivityLogged;
 use Illuminate\Database\Eloquent\Model;
 
 trait LogsActivity
@@ -37,7 +38,7 @@ trait LogsActivity
                 $newValues[$field] = $model->getAttribute($field);
             }
 
-            event(new \App\Events\ActivityLogged(
+            event(new ActivityLogged(
                 entityType: $model->getActivityLogEntityType(),
                 entityId: (int) $model->getKey(),
                 venueId: $model->getAttribute('venue_id'),

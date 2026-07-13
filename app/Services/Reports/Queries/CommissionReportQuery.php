@@ -5,6 +5,7 @@ namespace App\Services\Reports\Queries;
 use App\Enums\FinancialDomain\SettlementEntryType;
 use App\Services\Reports\Queries\Concerns\AppliesReportDateRange;
 use App\Services\Settlements\Data\SettlementDateRange;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -74,7 +75,7 @@ class CommissionReportQuery
         ])->values()->all();
     }
 
-    private function sumByType(\Illuminate\Database\Query\Builder $query, SettlementEntryType $type): string
+    private function sumByType(Builder $query, SettlementEntryType $type): string
     {
         return $this->formatAmount(
             (clone $query)->where('type', $type->value)->sum('amount'),

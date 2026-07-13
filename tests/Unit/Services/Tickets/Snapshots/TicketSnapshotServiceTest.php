@@ -8,7 +8,6 @@ use App\Models\OrderItem;
 use App\Models\Ticket;
 use App\Models\TicketSnapshot;
 use App\Models\TicketType;
-use App\Models\Venue;
 use App\Services\Tickets\Snapshots\TicketSnapshotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;

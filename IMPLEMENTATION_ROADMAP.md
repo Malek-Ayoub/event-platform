@@ -40,10 +40,9 @@
    - ✅ 8.6.1 Dashboard Overview (`GET /api/tenant/organizer/dashboard`)
 4. ✅ 8.7 Admin Dashboard API
    - ✅ 8.7.1 Dashboard Overview (`GET /api/admin/dashboard`)
-5. ⏳ Backend Freeze Checklist
-6. ⏳ ADR-0001 (استكمال الوثيقة)
-7. ⏳ git tag v1.0-backend-freeze
-8. ⏳ Frontend v1
+5. ⏳ Batch 10.1 — Backend Freeze Audit
+6. ⏳ Batch 10.2 — Release Preparation (`CHANGELOG`, `README`, tag)
+7. ⏳ Frontend v1
 ```
 
 ### Backend v1 — ما تبقى
@@ -58,8 +57,9 @@ Backend v1
 │   └── GET /api/tenant/organizer/dashboard (endpoint رئيسي واحد)
 ├── Phase 8.7 Admin Dashboard
 │   └── GET /api/admin/dashboard (KPIs + today + top lists + latest activity + alerts)
-├── Backend Freeze Checklist
-├── ADR-0001 Backend v1 Freeze (استكمال)
+├── Backend Freeze Checklist (Batch 10.1 — audit)
+├── ADR-0001 Backend v1 Freeze (Accepted)
+├── Batch 10.2 — Release (`CHANGELOG`, `README`, tag)
 └── v1.0-backend-freeze (Git Tag)
 ```
 
@@ -105,6 +105,8 @@ Backend v1
 
 ### Backend Freeze Checklist (إلزامية قبل `git tag`)
 
+> **Batch 10.1 (2026-07-13):** تدقيق بدون ميزات جديدة. النتائج أدناه.
+
 ```text
 Domain
 ☑ Payments
@@ -114,35 +116,38 @@ Domain
 ☑ Settlement
 
 Architecture
-☐ Architecture Guards
-☐ ADR-0001 محدثة
-☐ OpenAPI محدثة
+☑ Architecture Guards (21 guard tests — 117 assertions)
+☑ ADR-0001 محدثة ومقبولة
+☑ OpenAPI — كل named routes موثّقة (OpenApiContractGuardTest)
 
 Quality
-☐ جميع الاختبارات ناجحة
-☐ Laravel Pint
-☐ لا TODO/FIXME حرجة
-☐ (اختياري) PHPStan/Psalm
+☑ جميع الاختبارات ناجحة (655/655)
+☑ Laravel Pint (تنسيق شامل)
+☑ لا TODO/FIXME حرجة في app/
+☐ (اختياري) PHPStan/Psalm — مؤجّل لما بعد الإطلاق
 
 Performance
-☐ لا N+1 في Dashboard APIs
-☐ Pagination لكل القوائم
-☐ Indexes للجداول الجديدة
+☑ لا N+1 في Dashboard APIs (DB::table + JOIN + LIMIT ثابت)
+☑ Pagination لقوائم CRUD؛ dashboard widgets بحدود ثابتة (5)
+☑ Indexes موجودة: orders(venue_id,status), settlement_entries(venue_id,occurred_at),
+  payment_transactions(venue_id,status), ticket_check_ins(ticket_id,checked_in_at),
+  events(venue_id,start_datetime)
+  ⚠ اختياري لاحقًا: orders(created_at), payment_transactions(updated_at) عند حجم بيانات كبير
 
 Security
-☐ Authorization
-☐ Rate Limiting
-☐ Validation
-☐ Audit Logs
+☑ Authorization — super admin للـ admin APIs؛ reports.view للمنظم
+☑ Validation — FormRequest على كل endpoint
+☑ Audit Logs — activity log على تغييرات الحالة
+⚠ Rate limiting — throttle على email verification فقط؛ تعزيز عام في Phase 10
 
 Operations
-☐ Queue
-☐ Scheduler
-☐ Mail
-☐ Storage
+☑ Queue — database driver افتراضي؛ outbox:process command جاهز
+☐ Scheduler — لا مهام مجدولة في routes/console.php؛ يُضبط في الإنتاج (outbox:process كل دقيقة)
+☑ Mail — log driver افتراضي؛ SMTP عبر env في الإنتاج
+☑ Storage — filesystems.php جاهز؛ ticket artifacts عبر storage disk
 ```
 
-عند اكتمال القائمة → `git tag v1.0-backend-freeze` → `git push origin v1.0-backend-freeze`.
+عند اكتمال Batch 10.2 → `git tag v1.0-backend-freeze` → `git push origin v1.0-backend-freeze`.
 
 ### Frontend v1 (مشروع مستقل بعد الـ Freeze)
 
@@ -2941,7 +2946,8 @@ Domain & Authorization (§1.1)
   ✅ Phase 8.5.5 — Reports (closed)
   ✅ Phase 8.6 — Organizer Dashboard API (8.6.1 overview)
   ✅ Phase 8.7 — Admin Dashboard API (8.7.1 overview)
-  ☐ Backend Freeze Checklist + ADR-0001 + tag v1.0-backend-freeze
+  ⏳ Batch 10.1 — Backend Freeze Audit
+  ☐ Batch 10.2 — Release Preparation + tag v1.0-backend-freeze
 ☐ Phase 9  — Frontend v1 (Organizer / Admin / Public / Scanner PWA)
 ☐ Phase 10 — Production Hardening + Pilot Event
 

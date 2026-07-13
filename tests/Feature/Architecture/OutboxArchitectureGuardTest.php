@@ -4,12 +4,14 @@ namespace Tests\Feature\Architecture;
 
 use App\Console\Commands\OutboxProcessCommand;
 use App\Jobs\ProcessOutboxEvents;
+use App\Models\OutboxConsumerReceipt;
+use App\Providers\OutboxServiceProvider;
 use App\Repositories\ConsumerReceiptRepository;
 use App\Repositories\OutboxRepository;
 use App\Services\Commissions\CommissionService;
 use App\Services\Orders\OrderService;
-use App\Services\Outbox\OutboxDispatcher;
 use App\Services\Outbox\OutboxConsumerRegistry;
+use App\Services\Outbox\OutboxDispatcher;
 use App\Services\Payments\PaymentService;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
@@ -70,7 +72,7 @@ class OutboxArchitectureGuardTest extends TestCase
                 continue;
             }
 
-            if ($class === \App\Providers\OutboxServiceProvider::class) {
+            if ($class === OutboxServiceProvider::class) {
                 continue;
             }
 
@@ -82,7 +84,7 @@ class OutboxArchitectureGuardTest extends TestCase
                 continue;
             }
 
-            if ($class === \App\Models\OutboxConsumerReceipt::class) {
+            if ($class === OutboxConsumerReceipt::class) {
                 continue;
             }
 
@@ -112,7 +114,7 @@ class OutboxArchitectureGuardTest extends TestCase
         $allowed = [
             ConsumerReceiptRepository::class,
             OutboxDispatcher::class,
-            \App\Providers\OutboxServiceProvider::class,
+            OutboxServiceProvider::class,
         ];
 
         foreach ($this->discoverPhpClassesUnder(base_path('app')) as $class) {
@@ -124,7 +126,7 @@ class OutboxArchitectureGuardTest extends TestCase
                 continue;
             }
 
-            if ($class === \App\Models\OutboxConsumerReceipt::class) {
+            if ($class === OutboxConsumerReceipt::class) {
                 continue;
             }
 
@@ -150,7 +152,7 @@ class OutboxArchitectureGuardTest extends TestCase
             OutboxDispatcher::class,
             OutboxProcessCommand::class,
             ProcessOutboxEvents::class,
-            \App\Providers\OutboxServiceProvider::class,
+            OutboxServiceProvider::class,
         ];
 
         foreach ($this->discoverPhpClassesUnder(base_path('app')) as $class) {

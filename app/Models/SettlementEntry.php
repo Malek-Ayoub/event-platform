@@ -9,6 +9,7 @@ use Database\Factories\SettlementEntryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Immutable platform commission receivable ledger row (Phase 8.5.1).
@@ -29,8 +30,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $balance_after Outstanding commission owed by the organizer to the platform
  * @property string|null $correlation_id
  * @property array<string, mixed>|null $metadata
- * @property \Illuminate\Support\Carbon $occurred_at
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon $occurred_at
+ * @property Carbon $created_at
  */
 class SettlementEntry extends Model
 {

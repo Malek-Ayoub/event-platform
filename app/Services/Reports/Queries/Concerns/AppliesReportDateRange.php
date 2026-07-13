@@ -4,12 +4,13 @@ namespace App\Services\Reports\Queries\Concerns;
 
 use App\Services\Settlements\Data\SettlementDateRange;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
 trait AppliesReportDateRange
 {
     /**
-     * @param  Builder<\Illuminate\Database\Eloquent\Model>|QueryBuilder  $query
+     * @param  Builder<Model>|QueryBuilder  $query
      */
     protected function applyDateRange(Builder|QueryBuilder $query, string $column, SettlementDateRange $range): void
     {

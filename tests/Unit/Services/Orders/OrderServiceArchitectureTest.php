@@ -100,7 +100,7 @@ class OrderServiceArchitectureTest extends TestCase
     #[Test]
     public function issue_tickets_service_uses_outbox_service_for_ticket_issued_events(): void
     {
-        $reflection = new \ReflectionClass(IssueTicketsService::class);
+        $reflection = new ReflectionClass(IssueTicketsService::class);
         $constructor = $reflection->getConstructor();
         $this->assertNotNull($constructor);
 

@@ -4,8 +4,6 @@ namespace Tests\Unit\Policies;
 
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
-use App\Models\Venue;
-use App\Models\VenueUser;
 use App\Policies\VenuePolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;

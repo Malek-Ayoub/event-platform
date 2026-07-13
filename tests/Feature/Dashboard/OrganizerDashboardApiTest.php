@@ -142,10 +142,10 @@ class OrganizerDashboardApiTest extends TestCase
             ->forOrder($order)
             ->forTicketType($ticketType)
             ->create([
-            'status' => TicketStatus::CheckedIn,
-            'issued_at' => now(),
-            'checked_in_at' => now(),
-        ]);
+                'status' => TicketStatus::CheckedIn,
+                'issued_at' => now(),
+                'checked_in_at' => now(),
+            ]);
 
         TicketCheckIn::factory()->forTicket($ticket)->create([
             'checked_in_at' => now(),

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Authorization;
 
 use App\Models\User;
+use App\Policies\UserPermissionPolicy;
 use App\Services\Authorization\PermissionService;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,7 +58,7 @@ class PermissionGateTest extends TestCase
         ['user' => $staff] = $this->createVenueStaff($venue);
         ['user' => $otherStaff] = $this->createVenueStaff($venue);
 
-        $policy = app(\App\Policies\UserPermissionPolicy::class);
+        $policy = app(UserPermissionPolicy::class);
 
         $this->assertTrue($policy->manageUserPermissions($owner, $staff, $venue->id));
         $this->assertFalse($policy->manageUserPermissions($staff, $otherStaff, $venue->id));

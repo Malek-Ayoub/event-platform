@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\ApiClient;
 use Database\Factories\ApiClientFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -52,7 +54,7 @@ class ApiClientAuthenticationTest extends TestCase
         ['venue' => $venue] = $this->createVenueOwner();
         ['plainSecret' => $secret] = $this->createApiClient($venue);
 
-        \Illuminate\Support\Facades\DB::table('api_clients')
+        DB::table('api_clients')
             ->where('api_key', 'partner-test-key')
             ->update(['active' => false]);
 
@@ -88,7 +90,7 @@ class ApiClientAuthenticationTest extends TestCase
     #[Test]
     public function factory_api_client_works_with_default_secret(): void
     {
-        $client = \App\Models\ApiClient::factory()->create();
+        $client = ApiClient::factory()->create();
 
         $response = $this
             ->withHeaders([

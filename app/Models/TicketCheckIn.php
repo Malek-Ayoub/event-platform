@@ -6,18 +6,19 @@ use Database\Factories\TicketCheckInFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Immutable admission audit log — source of truth for ticket check-ins (Phase 8.4).
  *
  * @property int $id
  * @property int $ticket_id
- * @property \Illuminate\Support\Carbon $checked_in_at
+ * @property Carbon $checked_in_at
  * @property int $checked_in_by_user_id
  * @property int|null $gate_id
  * @property string|null $device_id
  * @property string|null $notes
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon $created_at
  */
 class TicketCheckIn extends Model
 {

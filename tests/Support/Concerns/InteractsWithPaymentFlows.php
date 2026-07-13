@@ -2,6 +2,7 @@
 
 namespace Tests\Support\Concerns;
 
+use App\Contracts\Payments\Http\HttpClientInterface;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Models\Event;
 use App\Models\EventPaymentAccount;
@@ -65,7 +66,7 @@ trait InteractsWithPaymentFlows
     {
         Http::swap(new Factory);
 
-        $this->app->forgetInstance(\App\Contracts\Payments\Http\HttpClientInterface::class);
+        $this->app->forgetInstance(HttpClientInterface::class);
         $this->app->forgetInstance(LaravelHttpClientAdapter::class);
         $this->app->forgetInstance(PaymentGatewayRegistry::class);
         $this->app->forgetInstance(PaymentGatewayService::class);

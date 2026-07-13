@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Ticket;
+use App\Models\TicketNumberCounter;
 use App\Models\TicketSerialCounter;
 use App\Models\TicketType;
 use App\Services\Orders\IssueTicketsService;
@@ -106,7 +107,7 @@ class TicketIdentityIssuanceTest extends TestCase
         ]);
 
         TicketSerialCounter::factory()->forEvent($event)->create(['last_serial' => 1]);
-        \App\Models\TicketNumberCounter::factory()->forEvent($event)->create(['last_number' => 99]);
+        TicketNumberCounter::factory()->forEvent($event)->create(['last_number' => 99]);
 
         $result = app(IssueTicketsService::class)->issueForPaidOrder($order->id);
 

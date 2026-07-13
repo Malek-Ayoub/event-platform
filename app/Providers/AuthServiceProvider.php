@@ -4,12 +4,12 @@ namespace App\Providers;
 
 use App\Models\ActivityLog;
 use App\Models\Category;
+use App\Models\CommissionPayment;
 use App\Models\Coupon;
 use App\Models\EmailTemplate;
 use App\Models\Event;
 use App\Models\Notification;
 use App\Models\Order;
-use App\Models\CommissionPayment;
 use App\Models\PaymentTransaction;
 use App\Models\PlatformSetting;
 use App\Models\Product;

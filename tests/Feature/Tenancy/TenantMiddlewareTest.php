@@ -2,12 +2,9 @@
 
 namespace Tests\Feature\Tenancy;
 
-use App\Domain\Tenancy\Contracts\ApiClientLookupInterface;
 use App\Domain\Tenancy\Contracts\VenueSubdomainLookupInterface;
-use App\Domain\Tenancy\Data\ResolvedApiClientData;
 use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\Support\Fakes\FakeApiClientLookup;
 use Tests\Support\Fakes\FakeVenueSubdomainLookup;
 use Tests\TestCase;
 

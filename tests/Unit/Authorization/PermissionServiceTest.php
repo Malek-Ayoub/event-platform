@@ -2,8 +2,10 @@
 
 namespace Tests\Unit\Authorization;
 
+use App\Events\Permissions\PermissionGranted;
 use App\Models\Permission;
 use App\Models\User;
+use App\Models\Venue;
 use App\Services\Authorization\PermissionService;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -65,7 +67,7 @@ class PermissionServiceTest extends TestCase
     public function customer_without_venue_membership_has_no_permissions(): void
     {
         $customer = User::factory()->create();
-        $venue = \App\Models\Venue::factory()->create();
+        $venue = Venue::factory()->create();
 
         $this->assertFalse($this->service->can($customer, 'orders.manage', $venue->id));
     }
@@ -116,7 +118,7 @@ class PermissionServiceTest extends TestCase
     #[Test]
     public function grant_dispatches_permission_granted_event(): void
     {
-        Event::fake([\App\Events\Permissions\PermissionGranted::class]);
+        Event::fake([PermissionGranted::class]);
 
         ['user' => $owner, 'venue' => $venue] = $this->createVenueOwner();
         ['user' => $staff] = $this->createVenueStaff($venue);
@@ -124,6 +126,6 @@ class PermissionServiceTest extends TestCase
 
         $this->service->grant($owner, $staff, $permission, $venue->id);
 
-        Event::assertDispatched(\App\Events\Permissions\PermissionGranted::class);
+        Event::assertDispatched(PermissionGranted::class);
     }
 }
