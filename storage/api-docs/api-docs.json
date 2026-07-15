@@ -1388,6 +1388,73 @@
                 ]
             }
         },
+        "/api/public/events": {
+            "get": {
+                "tags": [
+                    "Public"
+                ],
+                "summary": "List published events (public catalog)",
+                "description": "Public, unauthenticated catalog of published events for the current venue context. Only events with status `published` are included. No Authorization header is required.",
+                "operationId": "public.events.index",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 12,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "starts_at",
+                            "default": "starts_at"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated published events",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PublicEventListItem"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/api/tenant/ping": {
             "get": {
                 "tags": [
@@ -6386,6 +6453,68 @@
                 },
                 "type": "object"
             },
+            "PublicEventListItem": {
+                "description": "Public catalog projection of a published event for anonymous visitors. Intentionally separate from tenant EventResource.",
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "description",
+                    "venue",
+                    "starts_at"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Projection of `App\\Http\\Resources\\Events\\PublicEventListItemResource`.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "summer-jazz-night"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Summer Jazz Night"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "A short teaser description for the catalog listing."
+                    },
+                    "venue": {
+                        "type": "string",
+                        "example": "Harborview Pavilion"
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-08-15T19:30:00Z"
+                    },
+                    "starting_price": {
+                        "properties": {
+                            "amount": {
+                                "description": "Decimal amount as string (consistent with other money schemas in this spec).",
+                                "type": "string",
+                                "example": "45.00"
+                            },
+                            "currency": {
+                                "type": "string",
+                                "example": "USD",
+                                "maxLength": 3,
+                                "minLength": 3
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "SettlementSummary": {
                 "properties": {
                     "gross_sales": {
@@ -6651,6 +6780,10 @@
         {
             "name": "Settlement",
             "description": "Settlement"
+        },
+        {
+            "name": "Public",
+            "description": "Public"
         },
         {
             "name": "Tickets",

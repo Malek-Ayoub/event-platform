@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
+use App\Http\Controllers\Api\PublicEventController;
 use App\Http\Controllers\Api\TaxRateController;
 use App\Http\Controllers\Api\TicketCheckInController;
 use App\Http\Controllers\Api\TicketTypeController;
@@ -26,6 +27,10 @@ use Illuminate\Support\Facades\Route;
 | Tenant-scoped routes resolved via TenantMiddleware (subdomain path only).
 |
 */
+
+Route::prefix('public')->group(function (): void {
+    Route::get('events', [PublicEventController::class, 'index'])->name('public.events.index');
+});
 
 Route::prefix('tenant')->group(function (): void {
     Route::get('/ping', function (TenantContextInterface $tenantContext) {
