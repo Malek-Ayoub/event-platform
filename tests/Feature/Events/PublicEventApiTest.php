@@ -207,4 +207,174 @@ class PublicEventApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.starting_price', null);
     }
+
+    #[Test]
+    public function it_shows_a_published_event_with_ticket_types_without_authentication(): void
+    {
+        $this->seedPlatformCurrency('EUR');
+
+        $venue = Venue::factory()->create(['subdomain' => 'public-detail']);
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->withoutCategory()->published()->create([
+            'venue_id' => $venue->id,
+            'name' => 'Summer Jazz Night',
+            'slug' => 'summer-jazz-night',
+            'description' => 'An evening of jazz.',
+            'banner_url' => 'https://cdn.example.com/jazz.jpg',
+            'start_datetime' => now()->addWeek(),
+            'end_datetime' => now()->addWeek()->addHours(3),
+        ]);
+
+        $available = TicketType::factory()->forEvent($event)->create([
+            'name' => 'General Admission',
+            'price' => '45.00',
+            'quantity' => 100,
+            'quantity_sold' => 10,
+            'sale_start' => now()->subDay(),
+            'sale_end' => now()->addMonth(),
+            'benefits' => ['Early entry'],
+            'color' => '#336699',
+        ]);
+
+        $response = $this->withTenantHost($venue->subdomain)
+            ->getJson('/api/public/events/summer-jazz-night');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.id', $event->id)
+            ->assertJsonPath('data.slug', 'summer-jazz-night')
+            ->assertJsonPath('data.title', 'Summer Jazz Night')
+            ->assertJsonPath('data.description', 'An evening of jazz.')
+            ->assertJsonPath('data.venue', $venue->name)
+            ->assertJsonPath('data.image_url', 'https://cdn.example.com/jazz.jpg')
+            ->assertJsonPath('data.starting_price.amount', '45.00')
+            ->assertJsonPath('data.starting_price.currency', 'EUR')
+            ->assertJsonPath('data.ticket_types.0.id', $available->id)
+            ->assertJsonPath('data.ticket_types.0.name', 'General Admission')
+            ->assertJsonPath('data.ticket_types.0.price.amount', '45.00')
+            ->assertJsonPath('data.ticket_types.0.price.currency', 'EUR')
+            ->assertJsonPath('data.ticket_types.0.remaining', 90)
+            ->assertJsonPath('data.ticket_types.0.is_available', true)
+            ->assertJsonPath('data.ticket_types.0.benefits.0', 'Early entry')
+            ->assertJsonPath('data.ticket_types.0.color', '#336699')
+            ->assertJsonStructure([
+                'data' => [
+                    'id',
+                    'slug',
+                    'title',
+                    'description',
+                    'venue',
+                    'image_url',
+                    'starts_at',
+                    'ends_at',
+                    'starting_price' => ['amount', 'currency'],
+                    'ticket_types' => [[
+                        'id',
+                        'name',
+                        'price' => ['amount', 'currency'],
+                        'remaining',
+                        'is_available',
+                        'benefits',
+                        'color',
+                    ]],
+                ],
+            ]);
+    }
+
+    #[Test]
+    public function it_returns_404_when_event_slug_does_not_exist(): void
+    {
+        $this->seedPlatformCurrency();
+
+        $venue = Venue::factory()->create(['subdomain' => 'missing-event']);
+
+        $this->withTenantHost($venue->subdomain)
+            ->getJson('/api/public/events/does-not-exist')
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function it_returns_404_when_event_exists_but_is_not_published(): void
+    {
+        $this->seedPlatformCurrency();
+
+        $venue = Venue::factory()->create(['subdomain' => 'draft-detail']);
+        Event::factory()->withoutCategory()->create([
+            'venue_id' => $venue->id,
+            'slug' => 'draft-show',
+            'status' => EventStatus::Draft,
+        ]);
+
+        $this->withTenantHost($venue->subdomain)
+            ->getJson('/api/public/events/draft-show')
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function it_does_not_show_events_belonging_to_another_tenant(): void
+    {
+        $this->seedPlatformCurrency();
+
+        $venueA = Venue::factory()->create(['subdomain' => 'detail-a']);
+        $venueB = Venue::factory()->create(['subdomain' => 'detail-b']);
+
+        Event::factory()->withoutCategory()->published()->create([
+            'venue_id' => $venueB->id,
+            'slug' => 'shared-slug',
+            'name' => 'Venue B Only',
+        ]);
+
+        $this->withTenantHost($venueA->subdomain)
+            ->getJson('/api/public/events/shared-slug')
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function it_includes_expired_ticket_types_as_unavailable(): void
+    {
+        $this->seedPlatformCurrency();
+
+        $venue = Venue::factory()->create(['subdomain' => 'expired-tickets']);
+        $this->bindTenant($venue->id);
+
+        $event = Event::factory()->withoutCategory()->published()->create([
+            'venue_id' => $venue->id,
+            'slug' => 'mixed-availability',
+        ]);
+
+        TicketType::factory()->forEvent($event)->create([
+            'name' => 'On Sale',
+            'price' => '30.00',
+            'quantity' => 50,
+            'quantity_sold' => 0,
+            'sale_start' => now()->subDay(),
+            'sale_end' => now()->addMonth(),
+        ]);
+
+        TicketType::factory()->forEvent($event)->create([
+            'name' => 'Expired',
+            'price' => '20.00',
+            'quantity' => 50,
+            'quantity_sold' => 0,
+            'sale_start' => now()->subMonth(),
+            'sale_end' => now()->subDay(),
+        ]);
+
+        $response = $this->withTenantHost($venue->subdomain)
+            ->getJson('/api/public/events/mixed-availability');
+
+        $response
+            ->assertOk()
+            ->assertJsonCount(2, 'data.ticket_types');
+
+        $ticketTypes = collect($response->json('data.ticket_types'));
+        $onSale = $ticketTypes->firstWhere('name', 'On Sale');
+        $expired = $ticketTypes->firstWhere('name', 'Expired');
+
+        $this->assertNotNull($onSale);
+        $this->assertTrue($onSale['is_available']);
+        $this->assertNotNull($expired);
+        $this->assertFalse($expired['is_available']);
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Models\Event;
 use App\Models\TicketType;
 use App\Services\Events\Data\PublicEventCatalogItem;
+use App\Services\Events\Data\PublicEventTicketTypeItem;
 use App\Services\PlatformSettings\PlatformSettingService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -54,6 +55,42 @@ class PublishedEventCatalogService
         return $paginator;
     }
 
+    public function findPublishedBySlug(string $slug): ?PublicEventCatalogItem
+    {
+        $event = Event::query()
+            ->published()
+            ->where('slug', $slug)
+            ->with([
+                'venue:id,name',
+                'ticketTypes' => static fn ($relation) => $relation->select([
+                    'id',
+                    'event_id',
+                    'name',
+                    'price',
+                    'quantity',
+                    'quantity_sold',
+                    'sale_start',
+                    'sale_end',
+                    'benefits',
+                    'color',
+                ]),
+            ])
+            ->first();
+
+        if ($event === null) {
+            return null;
+        }
+
+        $currency = $this->resolveCatalogCurrency();
+
+        return new PublicEventCatalogItem(
+            event: $event,
+            startingPriceAmount: $this->resolveStartingPrice($event),
+            currency: $currency,
+            ticketTypes: $this->mapTicketTypesForDetail($event, $currency),
+        );
+    }
+
     /**
      * Lowest available ticket type price for catalog display.
      *
@@ -91,24 +128,12 @@ class PublishedEventCatalogService
     }
 
     /**
-     * Catalog currency is intentionally sourced from platform_settings.default_currency only.
-     *
-     * We do not read payment_accounts or settlement_entries here: those tables belong to
-     * operational payment/settlement flows, may be unset for new venues, and this
-     * unauthenticated public route must stay isolated from sensitive financial data.
+     * Whether a ticket type is currently available for purchase in the public catalog.
      */
-    private function resolveCatalogCurrency(): string
+    public function isTicketTypeAvailable(TicketType $ticketType, ?Carbon $now = null): bool
     {
-        $settings = $this->platformSettingService->get()->settings ?? [];
-        $currency = $settings['default_currency'] ?? null;
+        $now ??= now();
 
-        return is_string($currency) && $currency !== ''
-            ? strtoupper($currency)
-            : 'USD';
-    }
-
-    private function isTicketTypeAvailable(TicketType $ticketType, Carbon $now): bool
-    {
         if ($ticketType->quantity <= $ticketType->quantity_sold) {
             return false;
         }
@@ -122,6 +147,51 @@ class PublishedEventCatalogService
         }
 
         return true;
+    }
+
+    /**
+     * Catalog currency is intentionally sourced from platform_settings.default_currency only.
+     *
+     * We do not read payment_accounts or settlement_entries here: those tables belong to
+     * operational payment/settlement flows, may be unset for new venues, and this
+     * unauthenticated public route must stay isolated from sensitive financial data.
+     */
+    public function resolveCatalogCurrency(): string
+    {
+        $settings = $this->platformSettingService->get()->settings ?? [];
+        $currency = $settings['default_currency'] ?? null;
+
+        return is_string($currency) && $currency !== ''
+            ? strtoupper($currency)
+            : 'USD';
+    }
+
+    /**
+     * @return list<PublicEventTicketTypeItem>
+     */
+    private function mapTicketTypesForDetail(Event $event, string $currency): array
+    {
+        if (! $event->relationLoaded('ticketTypes')) {
+            return [];
+        }
+
+        $now = now();
+        $items = [];
+
+        foreach ($event->ticketTypes as $ticketType) {
+            $items[] = new PublicEventTicketTypeItem(
+                id: (int) $ticketType->id,
+                name: (string) $ticketType->name,
+                price: $this->formatAmount((float) $ticketType->price),
+                currency: $currency,
+                remaining: max(0, (int) $ticketType->quantity - (int) $ticketType->quantity_sold),
+                isAvailable: $this->isTicketTypeAvailable($ticketType, $now),
+                benefits: is_array($ticketType->benefits) ? array_values($ticketType->benefits) : null,
+                color: $ticketType->color,
+            );
+        }
+
+        return $items;
     }
 
     private function formatAmount(float $amount): string

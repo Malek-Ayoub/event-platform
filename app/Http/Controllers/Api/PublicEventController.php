@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\Events\ListPublicEventsRequest;
+use App\Http\Requests\Events\ShowPublicEventRequest;
+use App\Http\Resources\Events\PublicEventDetailResource;
 use App\Http\Resources\Events\PublicEventListItemResource;
 use App\Services\Events\PublishedEventCatalogService;
 use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class PublicEventController extends BaseApiController
 {
@@ -24,5 +27,16 @@ class PublicEventController extends BaseApiController
             PublicEventListItemResource::collection($paginator),
             $paginator,
         );
+    }
+
+    public function show(ShowPublicEventRequest $request): JsonResponse
+    {
+        $item = $this->publishedEventCatalogService->findPublishedBySlug($request->slug());
+
+        if ($item === null) {
+            throw new NotFoundHttpException('Published event not found.');
+        }
+
+        return $this->respondResource(new PublicEventDetailResource($item));
     }
 }

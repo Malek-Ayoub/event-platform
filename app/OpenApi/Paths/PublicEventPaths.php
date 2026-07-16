@@ -43,4 +43,39 @@ final class PublicEventPaths
         ],
     )]
     public function index(): void {}
+
+    #[OA\Get(
+        path: '/api/public/events/{slug}',
+        operationId: 'public.events.show',
+        summary: 'Show a published event (public catalog)',
+        description: 'Public, unauthenticated detail for a single published event in the current venue context. Draft, cancelled, and completed events return 404. No Authorization header is required.',
+        tags: ['Public'],
+        security: [],
+        parameters: [
+            new OA\Parameter(
+                name: 'slug',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'string', example: 'summer-jazz-night'),
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Published event detail',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', ref: '#/components/schemas/PublicEventDetailItem'),
+                    ],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse'),
+            ),
+        ],
+    )]
+    public function show(): void {}
 }

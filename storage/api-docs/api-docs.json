@@ -1455,6 +1455,55 @@
                 "security": []
             }
         },
+        "/api/public/events/{slug}": {
+            "get": {
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Show a published event (public catalog)",
+                "description": "Public, unauthenticated detail for a single published event in the current venue context. Draft, cancelled, and completed events return 404. No Authorization header is required.",
+                "operationId": "public.events.show",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "summer-jazz-night"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Published event detail",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicEventDetailItem"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/api/tenant/ping": {
             "get": {
                 "tags": [
@@ -6449,6 +6498,134 @@
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PublicEventDetailItem": {
+                "description": "Public catalog detail projection of a published event for anonymous visitors.",
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "description",
+                    "venue",
+                    "starts_at",
+                    "ticket_types"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Projection of `App\\Http\\Resources\\Events\\PublicEventDetailResource`.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "summer-jazz-night"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Summer Jazz Night"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "A short teaser description for the catalog listing."
+                    },
+                    "venue": {
+                        "type": "string",
+                        "example": "Harborview Pavilion"
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-08-15T19:30:00Z"
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-08-15T22:30:00Z",
+                        "nullable": true
+                    },
+                    "starting_price": {
+                        "properties": {
+                            "amount": {
+                                "type": "string",
+                                "example": "45.00"
+                            },
+                            "currency": {
+                                "type": "string",
+                                "example": "USD",
+                                "maxLength": 3,
+                                "minLength": 3
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "ticket_types": {
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "id",
+                                "name",
+                                "price",
+                                "remaining",
+                                "is_available"
+                            ],
+                            "properties": {
+                                "id": {
+                                    "type": "integer",
+                                    "example": 1
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "example": "General Admission"
+                                },
+                                "price": {
+                                    "required": [
+                                        "amount",
+                                        "currency"
+                                    ],
+                                    "properties": {
+                                        "amount": {
+                                            "type": "string",
+                                            "example": "45.00"
+                                        },
+                                        "currency": {
+                                            "type": "string",
+                                            "example": "USD"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "remaining": {
+                                    "type": "integer",
+                                    "example": 42
+                                },
+                                "is_available": {
+                                    "type": "boolean",
+                                    "example": true
+                                },
+                                "benefits": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "nullable": true
+                                },
+                                "color": {
+                                    "type": "string",
+                                    "example": "#336699",
+                                    "nullable": true
+                                }
+                            },
+                            "type": "object"
+                        }
                     }
                 },
                 "type": "object"

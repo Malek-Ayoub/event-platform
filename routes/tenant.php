@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('public')->group(function (): void {
     Route::get('events', [PublicEventController::class, 'index'])->name('public.events.index');
+    Route::get('events/{slug}', [PublicEventController::class, 'show'])->name('public.events.show');
 });
 
 Route::prefix('tenant')->group(function (): void {
