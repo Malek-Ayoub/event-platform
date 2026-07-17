@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\PublicEventController;
 use App\Http\Controllers\Api\PublicOrderController;
+use App\Http\Controllers\Api\PublicPaymentController;
 use App\Http\Controllers\Api\TaxRateController;
 use App\Http\Controllers\Api\TicketTypeController;
 use Illuminate\Http\Request;
@@ -42,6 +43,7 @@ class ControllerArchitectureGuardTest extends TestCase
         EventController::class,
         PublicEventController::class,
         PublicOrderController::class,
+        PublicPaymentController::class,
         CategoryController::class,
         TicketTypeController::class,
         ProductController::class,
@@ -66,6 +68,11 @@ class ControllerArchitectureGuardTest extends TestCase
         EventController::class => ['OrderService', 'PaymentService', 'TicketService'],
         PublicEventController::class => ['OrderService', 'PaymentService', 'TicketService'],
         PublicOrderController::class => ['PaymentService', 'TicketService', 'EventService'],
+        PublicPaymentController::class => [
+            'OrderService', 'PaymentService', 'TicketService', 'EventService', 'OrderStatus::Paid',
+            'PaymentGatewayService', 'PaymentGatewayRegistry', 'PaymentVerificationGateway',
+            'RefundService', 'CommissionService',
+        ],
         CategoryController::class => ['OrderService', 'PaymentService', 'TicketService'],
         TicketTypeController::class => ['OrderService', 'PaymentService', 'TicketService'],
         ProductController::class => ['OrderService', 'PaymentService', 'TicketService', 'EventService'],

@@ -1562,6 +1562,154 @@
                 "security": []
             }
         },
+        "/api/public/orders/{orderNumber}/payment-instructions": {
+            "post": {
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Create guest payment instructions",
+                "description": "Public, unauthenticated payment instructions for a pending order identified by order_number. Rate limited to 10 requests per minute per IP. No Authorization header is required. Does not expose numeric payment ids.",
+                "operationId": "public.orders.payment-instructions",
+                "parameters": [
+                    {
+                        "name": "orderNumber",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "ORD-ABCDEFGHIJ"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Payment instructions created or reused (idempotent)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicPaymentInstructionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found, not pending, or not in this venue",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation or business rule error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/api/public/orders/{orderNumber}/payment-verification": {
+            "post": {
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Verify guest payment by transaction number",
+                "description": "Public, unauthenticated verification of a wallet transfer for a pending order. Looks up the latest awaiting_transfer/verifying payment internally — payment ids are never accepted from the client. Rate limited to 10 requests per minute per IP.",
+                "operationId": "public.orders.payment-verification",
+                "parameters": [
+                    {
+                        "name": "orderNumber",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "ORD-ABCDEFGHIJ"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SubmitPublicPaymentVerificationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Verification result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicPaymentVerificationResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Order or active payment instruction not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation or business rule error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/api/tenant/ping": {
             "get": {
                 "tags": [
@@ -5378,6 +5526,20 @@
                 },
                 "type": "object"
             },
+            "SubmitPublicPaymentVerificationRequest": {
+                "required": [
+                    "transaction_number"
+                ],
+                "properties": {
+                    "transaction_number": {
+                        "description": "Wallet provider transfer reference submitted by the guest.",
+                        "type": "string",
+                        "example": "TX-1001",
+                        "maxLength": 255
+                    }
+                },
+                "type": "object"
+            },
             "VerifyPaymentRequest": {
                 "required": [
                     "transaction_number"
@@ -6851,6 +7013,70 @@
                         "type": "string",
                         "format": "email",
                         "example": "jane@example.com"
+                    }
+                },
+                "type": "object"
+            },
+            "PublicPaymentInstructionResource": {
+                "description": "Guest-facing payment instructions. Numeric payment and account ids are intentionally omitted.",
+                "required": [
+                    "provider",
+                    "merchant_account",
+                    "amount",
+                    "currency",
+                    "expires_at",
+                    "instructions"
+                ],
+                "properties": {
+                    "provider": {
+                        "description": "Wallet brand label for the guest.",
+                        "type": "string",
+                        "example": "shamcash"
+                    },
+                    "merchant_account": {
+                        "type": "string",
+                        "example": "WALLET-001"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "example": "120.00"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "USD"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "instructions": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "PublicPaymentVerificationResource": {
+                "description": "Guest-facing verification outcome. Internal payment fields are omitted.",
+                "required": [
+                    "status",
+                    "message"
+                ],
+                "properties": {
+                    "status": {
+                        "description": "Projection of `App\\Http\\Resources\\Payments\\PublicPaymentVerificationResource`.",
+                        "type": "string",
+                        "example": "paid",
+                        "enum": [
+                            "paid",
+                            "failed",
+                            "verifying",
+                            "awaiting_transfer",
+                            "expired"
+                        ]
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Payment confirmed."
                     }
                 },
                 "type": "object"

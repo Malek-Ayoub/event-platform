@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\PublicEventController;
 use App\Http\Controllers\Api\PublicOrderController;
+use App\Http\Controllers\Api\PublicPaymentController;
 use App\Http\Controllers\Api\TaxRateController;
 use App\Http\Controllers\Api\TicketCheckInController;
 use App\Http\Controllers\Api\TicketTypeController;
@@ -35,6 +36,12 @@ Route::prefix('public')->group(function (): void {
     Route::post('orders', [PublicOrderController::class, 'store'])
         ->middleware('throttle:10,1')
         ->name('public.orders.store');
+    Route::post('orders/{orderNumber}/payment-instructions', [PublicPaymentController::class, 'instructions'])
+        ->middleware('throttle:10,1')
+        ->name('public.orders.payment-instructions');
+    Route::post('orders/{orderNumber}/payment-verification', [PublicPaymentController::class, 'verify'])
+        ->middleware('throttle:10,1')
+        ->name('public.orders.payment-verification');
 });
 
 Route::prefix('tenant')->group(function (): void {
