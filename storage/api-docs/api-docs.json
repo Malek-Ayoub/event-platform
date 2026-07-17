@@ -1504,6 +1504,64 @@
                 "security": []
             }
         },
+        "/api/public/orders": {
+            "post": {
+                "tags": [
+                    "Public"
+                ],
+                "summary": "Create a guest order (public checkout)",
+                "description": "Public, unauthenticated order creation for a published event in the current venue context. Guests cannot set customer_user_id or reservation_id. Rate limited to 10 requests per minute per IP. No Authorization header is required.",
+                "operationId": "public.orders.store",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePublicOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Guest order created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicOrderResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation or business rule error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/api/tenant/ping": {
             "get": {
                 "tags": [
@@ -5123,6 +5181,71 @@
                     ]
                 }
             },
+            "CreatePublicOrderRequest": {
+                "description": "Guest checkout payload. customer_user_id and reservation_id are not accepted.",
+                "required": [
+                    "event_id",
+                    "customer_name",
+                    "customer_email",
+                    "line_items"
+                ],
+                "properties": {
+                    "event_id": {
+                        "description": "Must reference a published event in the current venue.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "customer_name": {
+                        "type": "string",
+                        "example": "Jane Doe",
+                        "maxLength": 255
+                    },
+                    "customer_email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "jane@example.com"
+                    },
+                    "customer_phone": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 50
+                    },
+                    "line_items": {
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "ticket_type_id",
+                                "quantity"
+                            ],
+                            "properties": {
+                                "ticket_type_id": {
+                                    "type": "integer",
+                                    "example": 1
+                                },
+                                "quantity": {
+                                    "type": "integer",
+                                    "example": 2,
+                                    "minimum": 1
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "minItems": 1
+                    }
+                },
+                "type": "object",
+                "example": {
+                    "event_id": 1,
+                    "customer_name": "Jane Doe",
+                    "customer_email": "jane@example.com",
+                    "line_items": [
+                        {
+                            "ticket_type_id": 1,
+                            "quantity": 2
+                        }
+                    ]
+                }
+            },
             "InitiatePaymentRequest": {
                 "required": [
                     "order_id",
@@ -6688,6 +6811,46 @@
                         },
                         "type": "object",
                         "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PublicOrderResource": {
+                "description": "Limited public projection of a guest-created order. Internal financial fields are omitted.",
+                "required": [
+                    "id",
+                    "order_number",
+                    "status",
+                    "total",
+                    "customer_name",
+                    "customer_email"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Projection of `App\\Http\\Resources\\Orders\\PublicOrderResource`.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "order_number": {
+                        "type": "string",
+                        "example": "ORD-ABC12345"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "pending"
+                    },
+                    "total": {
+                        "type": "string",
+                        "example": "150.00"
+                    },
+                    "customer_name": {
+                        "type": "string",
+                        "example": "Jane Doe"
+                    },
+                    "customer_email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "jane@example.com"
                     }
                 },
                 "type": "object"

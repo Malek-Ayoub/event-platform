@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\PublicEventController;
+use App\Http\Controllers\Api\PublicOrderController;
 use App\Http\Controllers\Api\TaxRateController;
 use App\Http\Controllers\Api\TicketCheckInController;
 use App\Http\Controllers\Api\TicketTypeController;
@@ -31,6 +32,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('public')->group(function (): void {
     Route::get('events', [PublicEventController::class, 'index'])->name('public.events.index');
     Route::get('events/{slug}', [PublicEventController::class, 'show'])->name('public.events.show');
+    Route::post('orders', [PublicOrderController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('public.orders.store');
 });
 
 Route::prefix('tenant')->group(function (): void {
