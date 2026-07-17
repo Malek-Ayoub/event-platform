@@ -8,6 +8,7 @@ use App\Exceptions\Orders\InvalidTicketTypeException;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\Ticket;
+use App\Models\TicketType;
 use App\Services\Orders\Data\ResolvedOrderLineItemData;
 
 class TicketService
@@ -27,6 +28,21 @@ class TicketService
     {
         foreach ($lineItems as $lineItem) {
             $this->reserveInventoryForLineItem($order, $event, $lineItem);
+        }
+    }
+
+    /**
+     * Releases previously reserved inventory when a pending order is cancelled/expired.
+     *
+     * Each ticket type is locked with `lockForUpdate()` because this runs in a new
+     * transaction — the locks from the original order creation are long gone.
+     *
+     * @param  list<ResolvedOrderLineItemData>  $lineItems
+     */
+    public function releaseInventoryForOrder(Order $order, array $lineItems): void
+    {
+        foreach ($lineItems as $lineItem) {
+            $this->releaseInventoryForLineItem($order, $lineItem);
         }
     }
 
@@ -77,6 +93,28 @@ class TicketService
 
         $ticketType->update([
             'quantity_sold' => $ticketType->quantity_sold + $lineItem->quantity,
+        ]);
+    }
+
+    private function releaseInventoryForLineItem(
+        Order $order,
+        ResolvedOrderLineItemData $lineItem,
+    ): void {
+        if ($lineItem->quantity < 1) {
+            return;
+        }
+
+        $ticketType = TicketType::query()
+            ->whereKey($lineItem->ticketType->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if ($ticketType->event_id !== $order->event_id) {
+            throw InvalidTicketTypeException::forOrder($ticketType->id, (int) $order->id);
+        }
+
+        $ticketType->update([
+            'quantity_sold' => max(0, $ticketType->quantity_sold - $lineItem->quantity),
         ]);
     }
 

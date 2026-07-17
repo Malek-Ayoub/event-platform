@@ -2,12 +2,14 @@
 
 namespace App\Services\Orders;
 
+use App\Domain\Tenancy\Contracts\TenantContextInterface;
 use App\Enums\OrdersDomain\OrderStatus;
 use App\Exceptions\Orders\ReservationAlreadyLinkedException;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Reservation;
+use App\Models\Scopes\BelongsToVenueScope;
 use App\Models\TicketType;
 use App\Services\ActivityLogService;
 use App\Services\Orders\Data\CreateOrderData;
@@ -27,6 +29,7 @@ class OrderService
         private ActivityLogService $activityLogService,
         private OutboxService $outboxService,
         private PaymentAccountResolver $paymentAccountResolver,
+        private TenantContextInterface $tenantContext,
     ) {}
 
     public function list(int $perPage = 15, ?int $eventId = null, ?OrderStatus $status = null): LengthAwarePaginator
@@ -111,6 +114,123 @@ class OrderService
 
             return $order->fresh(['orderItems']);
         });
+    }
+
+    /**
+     * Cancel stale pending orders and release their reserved inventory.
+     *
+     * Each order is processed in its own transaction. When no tenant is bound
+     * (console/cron), candidates are selected across all venues — the same
+     * cross-tenant pattern used by outbox processing.
+     */
+    public function expireStalePendingOrders(int $olderThanMinutes, int $limit = 100): int
+    {
+        $cutoff = now()->subMinutes($olderThanMinutes);
+
+        $query = Order::query()
+            ->where('status', OrderStatus::Pending)
+            ->where('created_at', '<', $cutoff)
+            ->whereNotExists(function ($sub): void {
+                $sub->selectRaw('1')
+                    ->from('payment_transactions')
+                    ->whereColumn('payment_transactions.order_id', 'orders.id');
+            })
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->limit($limit);
+
+        if (! $this->tenantContext->isResolved()) {
+            $query->withoutGlobalScope(BelongsToVenueScope::class);
+        }
+
+        $candidates = $query->get(['id', 'venue_id']);
+        $expiredCount = 0;
+
+        foreach ($candidates as $candidate) {
+            if ($this->expireSingleStalePendingOrder((int) $candidate->id, (int) $candidate->venue_id)) {
+                $expiredCount++;
+            }
+        }
+
+        return $expiredCount;
+    }
+
+    private function expireSingleStalePendingOrder(int $orderId, int $venueId): bool
+    {
+        $previous = [
+            'resolved' => $this->tenantContext->isResolved(),
+            'venueId' => $this->tenantContext->getVenueId(),
+            'source' => $this->tenantContext->getSource(),
+            'apiClientId' => $this->tenantContext->getApiClientId(),
+            'scopes' => $this->tenantContext->getScopes(),
+        ];
+
+        try {
+            $this->tenantContext->bind($venueId, 'console');
+
+            return $this->transactionRunner->run(function () use ($orderId): bool {
+                $order = Order::query()
+                    ->whereKey($orderId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($order === null || $order->status !== OrderStatus::Pending) {
+                    return false;
+                }
+
+                if ($order->paymentTransactions()->exists()) {
+                    return false;
+                }
+
+                $order->load(['orderItems.ticketType']);
+
+                $lineItems = $order->orderItems
+                    ->map(fn (OrderItem $item): ResolvedOrderLineItemData => new ResolvedOrderLineItemData(
+                        ticketType: $item->ticketType,
+                        quantity: (int) $item->quantity,
+                        unitPrice: $this->formatPrice($item->unit_price),
+                    ))
+                    ->values()
+                    ->all();
+
+                $this->ticketService->releaseInventoryForOrder($order, $lineItems);
+
+                $oldStatus = $order->status->value;
+                $order->update(['status' => OrderStatus::Cancelled]);
+
+                $this->activityLogService->record(
+                    actor: null,
+                    entity: $order,
+                    action: 'expired_stale',
+                    oldValues: ['status' => $oldStatus],
+                    newValues: ['status' => OrderStatus::Cancelled->value],
+                    changedFields: ['status'],
+                );
+
+                $this->outboxService->record(
+                    eventType: 'order.expired',
+                    aggregate: $order,
+                    payload: [
+                        'order_number' => $order->order_number,
+                        'event_id' => $order->event_id,
+                        'status' => OrderStatus::Cancelled->value,
+                    ],
+                );
+
+                return true;
+            });
+        } finally {
+            if ($previous['resolved'] && $previous['venueId'] !== null) {
+                $this->tenantContext->bind(
+                    (int) $previous['venueId'],
+                    (string) ($previous['source'] ?? 'console'),
+                    $previous['apiClientId'],
+                    $previous['scopes'],
+                );
+            } else {
+                $this->tenantContext->clear();
+            }
+        }
     }
 
     /**
