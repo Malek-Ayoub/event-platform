@@ -54,7 +54,9 @@ Route::prefix('tenant')->group(function (): void {
     })->name('tenant.ping');
 
     Route::prefix('auth')->group(function (): void {
-        Route::post('login', [AuthController::class, 'tenantLogin'])->name('tenant.auth.login');
+        Route::post('login', [AuthController::class, 'tenantLogin'])
+            ->middleware('throttle:login')
+            ->name('tenant.auth.login');
 
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::get('user', [AuthController::class, 'tenantUser'])->name('tenant.auth.user');

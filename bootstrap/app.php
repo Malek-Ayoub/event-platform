@@ -35,6 +35,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'api_client' => ApiClientMiddleware::class,
             'permission' => CheckPermission::class,
         ]);
+
+        // Baseline API throttle (named limiter "api"); route-level throttles remain independent buckets.
+        $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

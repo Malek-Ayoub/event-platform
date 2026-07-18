@@ -27,11 +27,19 @@ Route::get('/health', function () {
 })->name('api.health');
 
 Route::prefix('auth')->group(function (): void {
-    Route::post('register', [AuthController::class, 'register'])->name('auth.register');
-    Route::post('login', [AuthController::class, 'login'])->name('auth.login');
+    Route::post('register', [AuthController::class, 'register'])
+        ->middleware('throttle:login')
+        ->name('auth.register');
+    Route::post('login', [AuthController::class, 'login'])
+        ->middleware('throttle:login')
+        ->name('auth.login');
 
-    Route::post('password/forgot', [PasswordController::class, 'forgot'])->name('auth.password.forgot');
-    Route::post('password/reset', [PasswordController::class, 'reset'])->name('auth.password.reset');
+    Route::post('password/forgot', [PasswordController::class, 'forgot'])
+        ->middleware('throttle:login')
+        ->name('auth.password.forgot');
+    Route::post('password/reset', [PasswordController::class, 'reset'])
+        ->middleware('throttle:login')
+        ->name('auth.password.reset');
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout'])->name('auth.logout');
