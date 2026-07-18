@@ -142,7 +142,7 @@ Security
 
 Operations
 ☑ Queue — database driver افتراضي؛ outbox:process command جاهز
-☐ Scheduler — لا مهام مجدولة في routes/console.php؛ يُضبط في الإنتاج (outbox:process كل دقيقة)
+☑ Scheduler — `outbox:process --once` كل دقيقة و`orders:expire-stale` كل 5 دقائق معرّفان في routes/console.php؛ التشغيل الفعلي في الإنتاج ما زال يتطلب cron يستدعي `php artisan schedule:run` (بند Production منفصل)
 ☑ Mail — log driver افتراضي؛ SMTP عبر env في الإنتاج
 ☑ Storage — filesystems.php جاهز؛ ticket artifacts عبر storage disk
 ```
