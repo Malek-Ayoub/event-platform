@@ -179,6 +179,22 @@ Production
 └── Pilot Event (أول فعالية حقيقية)
 ```
 
+#### Pre-Deploy Environment Checklist
+
+قبل أول نشر حقيقي (عند توفر VPS/نطاق)، غيّر هذه القيم في `.env` الإنتاجي — قيم `.env.example` تبقى للتطوير المحلي كما هي:
+
+- [ ] `APP_ENV=production`
+- [ ] `APP_DEBUG=false`
+- [ ] `LOG_LEVEL=error` أو `warning` (ليس `debug`)
+- [ ] `CORS_ALLOWED_ORIGINS=<نطاقات الواجهات الأربع الفعلية مفصولة بفواصل>` — ليس `*`
+- [ ] `MAIL_MAILER=smtp` + بيانات SMTP حقيقية (`MAIL_HOST` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM_*`) — ليس `log`
+- [ ] `APISYRIA_*` — بيانات حساب الإنتاج الحقيقية (ليست مفاتيح/عنوان اختبار)
+- [ ] `TENANCY_BASE_DOMAIN=<النطاق الحقيقي>` (مثل `example.com` بدل `localhost`)
+- [ ] `DB_CONNECTION` مناسب لحجم الإنتاج المتوقع — SQLite الحالي كافٍ لبداية صغيرة؛ MySQL/PostgreSQL قرار لاحق حسب الحمل (لا فرض هنا)
+- [ ] تفعيل cron فعلي يستدعي `php artisan schedule:run` كل دقيقة — الجدولة معرّفة في `routes/console.php` (`outbox:process --once` و`orders:expire-stale`) لكنها لا تعمل بدون cron على السيرفر
+
+تفاصيل Nginx / Supervisor / systemd تُبنى لاحقًا عند توفر VPS فعلي.
+
 ### Pilot Event — اختبار القبول (قبل أول عميل)
 
 دورة كاملة **بدون تدخل يدوي في DB:**
