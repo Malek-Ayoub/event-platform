@@ -21,7 +21,7 @@ class TableSeatFactory extends Factory
     {
         return [
             'venue_table_id' => VenueTable::factory(),
-            'seat_number' => (string) fake()->numberBetween(1, 20),
+            'seat_number' => (string) fake()->unique()->numberBetween(1, 999),
             'status' => SeatingUnitStatus::Available,
         ];
     }

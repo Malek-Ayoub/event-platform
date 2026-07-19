@@ -21,7 +21,7 @@ class VenueTableFactory extends Factory
     {
         return [
             'zone_id' => Zone::factory(),
-            'table_number' => (string) fake()->numberBetween(1, 99),
+            'table_number' => (string) fake()->unique()->numberBetween(1, 999),
             'capacity' => fake()->numberBetween(2, 12),
             'min_spend' => fake()->optional()->randomFloat(2, 100, 1000),
             'status' => SeatingUnitStatus::Available,
