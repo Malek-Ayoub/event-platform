@@ -72,6 +72,11 @@ class GatewayArchitectureGuardTest extends TestCase
     #[Test]
     public function gateway_implementations_do_not_import_eloquent_models(): void
     {
+        $this->assertNotEmpty(
+            $this->gatewayImplementationClasses,
+            'Expected to discover at least one gateway implementation under app/Services/Payments/Gateway',
+        );
+
         foreach ($this->gatewayImplementationClasses as $class) {
             $source = $this->sourceOf($class);
 
@@ -86,6 +91,11 @@ class GatewayArchitectureGuardTest extends TestCase
     #[Test]
     public function gateway_implementations_do_not_use_forbidden_integrations(): void
     {
+        $this->assertNotEmpty(
+            $this->gatewayImplementationClasses,
+            'Expected to discover at least one gateway implementation under app/Services/Payments/Gateway',
+        );
+
         foreach ($this->gatewayImplementationClasses as $class) {
             $source = $this->sourceOf($class);
 
@@ -156,7 +166,14 @@ class GatewayArchitectureGuardTest extends TestCase
             'App\\Contracts\\Payments\\PaymentVerificationGateway',
         ];
 
-        foreach ($this->discoverClassesForbiddenFromGatewayRegistryAccess() as $class) {
+        $classes = $this->discoverClassesForbiddenFromGatewayRegistryAccess();
+
+        $this->assertNotEmpty(
+            $classes,
+            'Expected to discover classes under app/Http/Controllers and app/Services',
+        );
+
+        foreach ($classes as $class) {
             $source = $this->sourceOf($class);
 
             foreach ($forbiddenPatterns as $pattern) {
@@ -358,47 +375,29 @@ class GatewayArchitectureGuardTest extends TestCase
             PaymentGatewayService::class,
         ];
 
-        foreach ([
-            base_path('app/Http/Controllers'),
-            base_path('app/Services'),
-        ] as $directory) {
-            if (! is_dir($directory)) {
+        foreach ($this->discoverPhpClassesUnder(base_path('app')) as $class) {
+            $inControllers = str_starts_with($class, 'App\\Http\\Controllers\\');
+            $inServices = str_starts_with($class, 'App\\Services\\');
+
+            if (! $inControllers && ! $inServices) {
                 continue;
             }
 
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($directory),
-            );
-
-            foreach ($iterator as $file) {
-                if (! $file->isFile() || $file->getExtension() !== 'php') {
-                    continue;
-                }
-
-                $relative = str_replace(
-                    [base_path('app').DIRECTORY_SEPARATOR, '.php', DIRECTORY_SEPARATOR],
-                    ['', '', '\\'],
-                    $file->getPathname(),
-                );
-
-                if (str_starts_with($relative, 'Services\\Payments\\Gateway\\')) {
-                    continue;
-                }
-
-                $class = 'App\\'.$relative;
-
-                if (! class_exists($class) || in_array($class, $allowed, true)) {
-                    continue;
-                }
-
-                $reflection = new ReflectionClass($class);
-
-                if ($reflection->isInterface() || $reflection->isAbstract()) {
-                    continue;
-                }
-
-                $classes[] = $class;
+            if (str_starts_with($class, 'App\\Services\\Payments\\Gateway\\')) {
+                continue;
             }
+
+            if (in_array($class, $allowed, true)) {
+                continue;
+            }
+
+            $reflection = new ReflectionClass($class);
+
+            if ($reflection->isInterface() || $reflection->isAbstract()) {
+                continue;
+            }
+
+            $classes[] = $class;
         }
 
         sort($classes);
@@ -412,30 +411,9 @@ class GatewayArchitectureGuardTest extends TestCase
     private function discoverGatewayImplementationClasses(): array
     {
         $classes = [];
-        $directory = base_path('app/Services/Payments/Gateway');
 
-        if (! is_dir($directory)) {
-            return $classes;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory),
-        );
-
-        foreach ($iterator as $file) {
-            if (! $file->isFile() || $file->getExtension() !== 'php') {
-                continue;
-            }
-
-            $relative = str_replace(
-                [base_path('app').DIRECTORY_SEPARATOR, '.php', DIRECTORY_SEPARATOR],
-                ['', '', '\\'],
-                $file->getPathname(),
-            );
-
-            $class = 'App\\'.$relative;
-
-            if (! class_exists($class)) {
+        foreach ($this->discoverPhpClassesUnder(base_path('app')) as $class) {
+            if (! str_starts_with($class, 'App\\Services\\Payments\\Gateway\\')) {
                 continue;
             }
 
@@ -537,11 +515,13 @@ class GatewayArchitectureGuardTest extends TestCase
                 continue;
             }
 
+            // Normalize mixed / and \ so Windows paths from base_path('app/...') still resolve.
             $relative = str_replace(
-                [base_path('app').DIRECTORY_SEPARATOR, '.php', DIRECTORY_SEPARATOR],
-                ['', '', '\\'],
+                [base_path('app'), '.php'],
+                ['', ''],
                 $file->getPathname(),
             );
+            $relative = trim(str_replace(['/', '\\'], '\\', $relative), '\\');
 
             $class = 'App\\'.$relative;
 
