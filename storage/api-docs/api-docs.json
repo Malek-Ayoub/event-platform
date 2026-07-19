@@ -736,6 +736,77 @@
                 ]
             }
         },
+        "/api/admin/venues": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create a venue and its owner account",
+                "operationId": "admin.venues.store",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateVenueRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Venue created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VenueResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/health": {
             "get": {
                 "tags": [
@@ -5394,6 +5465,44 @@
                     ]
                 }
             },
+            "CreateVenueRequest": {
+                "required": [
+                    "name",
+                    "subdomain",
+                    "owner_name",
+                    "owner_email",
+                    "owner_password"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Harbor Hall",
+                        "maxLength": 255
+                    },
+                    "subdomain": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9-]+$",
+                        "example": "harbor-hall",
+                        "maxLength": 255
+                    },
+                    "owner_name": {
+                        "type": "string",
+                        "example": "Sam Organizer",
+                        "maxLength": 255
+                    },
+                    "owner_email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "owner@harbor.test"
+                    },
+                    "owner_password": {
+                        "type": "string",
+                        "format": "password",
+                        "minLength": 8
+                    }
+                },
+                "type": "object"
+            },
             "InitiatePaymentRequest": {
                 "required": [
                     "order_id",
@@ -7292,6 +7401,51 @@
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "VenueResource": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "subdomain": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "suspended",
+                            "pending"
+                        ]
+                    },
+                    "commission_rate": {
+                        "type": "string",
+                        "example": "1.00"
+                    },
+                    "owner": {
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "email": {
+                                "type": "string",
+                                "format": "email"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
                     }
                 },
                 "type": "object"

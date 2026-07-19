@@ -47,6 +47,7 @@ class ServiceArchitectureGuardTest extends TestCase
         'Refunds',
         'Commissions',
         'PlatformSettings',
+        'Venues',
     ];
 
     /** @var list<string> */
