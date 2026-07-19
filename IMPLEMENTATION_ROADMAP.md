@@ -187,6 +187,7 @@ Production
 - [ ] `APP_DEBUG=false`
 - [ ] `LOG_LEVEL=error` أو `warning` (ليس `debug`)
 - [ ] `CORS_ALLOWED_ORIGINS=<نطاقات الواجهات الأربع الفعلية مفصولة بفواصل>` — ليس `*`
+- [ ] `SENTRY_LARAVEL_DSN=<DSN حقيقي من مشروع Sentry الإنتاجي>` — فارغ محليًا يعطّل المراقبة تمامًا؛ مطلوب في الإنتاج لالتقاط الاستثناءات
 - [ ] `MAIL_MAILER=smtp` + بيانات SMTP حقيقية (`MAIL_HOST` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM_*`) — ليس `log`
 - [ ] `APISYRIA_*` — بيانات حساب الإنتاج الحقيقية (ليست مفاتيح/عنوان اختبار)
 - [ ] `TENANCY_BASE_DOMAIN=<النطاق الحقيقي>` (مثل `example.com` بدل `localhost`)
