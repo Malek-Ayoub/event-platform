@@ -76,7 +76,11 @@ class ApiExceptionRenderer
             ], $status);
         }
 
-        return null;
+        // Never fall through to Laravel's debug JSON renderer for API requests —
+        // report() still logs the full exception independently of this response.
+        return response()->json([
+            'message' => 'Server Error',
+        ], 500);
     }
 
     private function shouldRender(Request $request): bool

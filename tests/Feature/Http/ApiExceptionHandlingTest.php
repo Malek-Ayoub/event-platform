@@ -4,7 +4,10 @@ namespace Tests\Feature\Http;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class ApiExceptionHandlingTest extends TestCase
@@ -60,5 +63,34 @@ class ApiExceptionHandlingTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonStructure(['data' => ['token', 'token_type', 'user']]);
+    }
+
+    #[Test]
+    public function it_returns_generic_server_error_for_unhandled_exceptions_even_when_debug_is_on(): void
+    {
+        config()->set('app.debug', true);
+
+        Route::get('/api/__test/unhandled-exception', function (): never {
+            throw new RuntimeException('boom — must not appear in the JSON body');
+        });
+
+        Log::spy();
+
+        $response = $this->getJson('/api/__test/unhandled-exception');
+
+        $response
+            ->assertStatus(500)
+            ->assertExactJson(['message' => 'Server Error']);
+
+        $payload = $response->json();
+        $this->assertIsArray($payload);
+        $this->assertArrayNotHasKey('exception', $payload);
+        $this->assertArrayNotHasKey('file', $payload);
+        $this->assertArrayNotHasKey('line', $payload);
+        $this->assertArrayNotHasKey('trace', $payload);
+        $this->assertStringNotContainsString('boom', $response->getContent());
+
+        // report() runs independently of our render() fallback.
+        Log::shouldHaveReceived('error')->atLeast()->once();
     }
 }
