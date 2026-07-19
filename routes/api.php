@@ -67,8 +67,18 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function (): void {
     Route::post('commission-payments', [CommissionPaymentController::class, 'store'])
         ->name('admin.commission-payments.store');
 
+    Route::get('venues', [VenueController::class, 'index'])
+        ->name('admin.venues.index');
     Route::post('venues', [VenueController::class, 'store'])
         ->name('admin.venues.store');
+    Route::get('venues/{venue}', [VenueController::class, 'show'])
+        ->name('admin.venues.show');
+    Route::put('venues/{venue}', [VenueController::class, 'update'])
+        ->name('admin.venues.update');
+    Route::post('venues/{venue}/suspend', [VenueController::class, 'suspend'])
+        ->name('admin.venues.suspend');
+    Route::post('venues/{venue}/activate', [VenueController::class, 'activate'])
+        ->name('admin.venues.activate');
 
     Route::get('settlement/venues', [AdminSettlementController::class, 'venues'])
         ->name('admin.settlement.venues.index');

@@ -108,6 +108,7 @@ class ApiExceptionRenderer
             || str_starts_with($class, 'App\\Exceptions\\Settlements\\')
             || str_starts_with($class, 'App\\Exceptions\\Events\\')
             || str_starts_with($class, 'App\\Exceptions\\Tickets\\')
+            || str_starts_with($class, 'App\\Exceptions\\Venues\\')
             || str_starts_with($class, 'App\\Exceptions\\PlatformSettings\\')
         ) {
             return 422;
