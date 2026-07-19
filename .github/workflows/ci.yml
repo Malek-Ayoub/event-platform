@@ -30,14 +30,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-8.3-composer-
 
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
+      # .env + sqlite must exist before composer install: post-autoload-dump runs
+      # package:discover → boots Laravel → PermissionGateRegistrar queries the DB.
       - name: Prepare environment
         run: |
           cp .env.example .env
-          php artisan key:generate
           touch database/database.sqlite
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Generate application key
+        run: php artisan key:generate
 
       - name: Run migrations
         run: php artisan migrate --force
